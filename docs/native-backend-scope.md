@@ -70,6 +70,16 @@ overwritten each frame.
   BeamLookup + CachedBeams + Output on a still image, and compare against the
   ReShade output. If those three match, the remaining passes are plumbing.
 
+## Spike result
+
+ReShade's `fxc` compiles `LeanCRT.fx` to about 536 KB of plain HLSL with
+`__RESHADE_PERFORMANCE_MODE__=0`. The output has no ReShade runtime types: all
+parameters arrive in one `_Globals` constant buffer (roughly 50 members, names
+prefixed `V__`), and the pass entry points are ordinary `vs_5_0`/`ps_5_0`/
+`cs_5_0` functions. That confirms the native path is viable: compile the entry
+points to DXBC at build time, reflect the constant buffer once, fill it from
+LeanGlass preset data, and run the fixed pass graph.
+
 ## What is deliberately not in scope
 
 - Editing LeanCRT shader source.

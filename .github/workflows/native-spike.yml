@@ -29,7 +29,5 @@ jobs:
           name: native-spike
           path: |
             native-spike.bmp
-            final.bmp
             output.bmp
-            copy.bmp
           if-no-files-found: warn

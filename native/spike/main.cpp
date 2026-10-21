@@ -543,13 +543,12 @@ int main()
         { "Deinterlace", "F__deinterlaceVS", "F__deinterlacePS", nullptr, T_DEINTERLACE, -1, true, 0, 0 },
         { "History", "F__freezeFrameVS", "F__freezeFramePS", nullptr, T_FREEZE, -1, false, 0, 0 },
         { "PhosphorLookup", "F__generatePhosphorMaskVS", "F__leanPhosphorPS", nullptr, T_PHOSPHOR_MASK, T_PHOSPHOR_BLUE, false, 0, 0 },
-        { "Mask", "F__leanMaskVS", "F__leanMaskPS", nullptr, T_MASKED, -1, false, 0, 0 },
-        { "Bright", "F__leanBrightVS", "F__brightpassPS", nullptr, T_BRIGHT, -1, false, 0, 0 },
-        { "BloomVert", "F__leanBloomVerticalGatedVS", "F__leanBloomVerticalPS", nullptr, T_BLOOM_VERT, -1, false, 0, 0 },
-        { "BloomHoriz", "F__leanBloomHorizontalGatedVS", "F__bloomHorizontalPS", nullptr, T_BLOOM_HORIZ, -1, false, 0, 0 },
-        { "BloomComposite", nullptr, nullptr, "E__lean_bloom_32_16_1", -1, -1, false, 60, 68 },
+        { "Mask", "F__PostProcessVS", "F__leanMaskPS", nullptr, T_MASKED, -1, true, 0, 0 },
+        { "Bright", "F__brightpassVS", "F__brightpassPS", nullptr, T_BRIGHT, -1, true, 0, 0 },
+        { "BloomVert", "F__leanBloomVerticalVS", "F__leanBloomVerticalPS", nullptr, T_BLOOM_VERT, -1, true, 0, 0 },
+        { "BloomComposite", "F__bloomHorizontalVS", "F__bloomHorizontalPS", nullptr, T_BLOOM_HORIZ, -1, true, 0, 0 },
         { "GeometryCache", "F__leanGeometryCacheVS", "F__geometryPS", nullptr, T_GEOMETRY, -1, false, 0, 0 },
-        { "Output", "F__leanOutputVS", "F__leanFinalPS", nullptr, T_OUTPUT, -1, false, 0, 0 },
+        { "Output", "F__leanOutputVS", "F__leanOutputPS", nullptr, T_OUTPUT, -1, true, 0, 0 },
     };
 
     std::unordered_map<std::string, ComPtr<ID3D11VertexShader>>   vs_cache;
@@ -736,12 +735,6 @@ int main()
     }
 
     context->OMSetRenderTargets(0, nullptr, nullptr);
-
-    // Spike shortcut: the LeanCRT Output pass is still being debugged, but the
-    // fused compute pass already produced the finished straight image in texFinal.
-    // Copy it to the output target so the still can be inspected.
-    context->CopyResource(textures[T_OUTPUT].tex.Get(), textures[T_FINAL].tex.Get());
-    SaveTextureBmp(device.Get(), context.Get(), textures[T_OUTPUT], "copy.bmp");
 
     D3D11_TEXTURE2D_DESC staging_desc = {};
     textures[T_OUTPUT].tex->GetDesc(&staging_desc);

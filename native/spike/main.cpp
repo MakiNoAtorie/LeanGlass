@@ -266,8 +266,7 @@ void UploadFrameCount(ID3D11DeviceContext* context, ID3D11Buffer* buffer, UINT f
 }
 
 void PrintAverage(ID3D11Device* device, ID3D11DeviceContext* context, Texture& texture, const char* name)
-{
-    D3D11_TEXTURE2D_DESC desc = {};
+{    D3D11_TEXTURE2D_DESC desc = {};
     texture.tex->GetDesc(&desc);
 
     D3D11_TEXTURE2D_DESC staging_desc = desc;
@@ -330,6 +329,52 @@ void PrintAverage(ID3D11Device* device, ID3D11DeviceContext* context, Texture& t
     context->Unmap(staging.Get(), 0);
     if (count)
         std::cout << "  avg " << name << ": " << (sum / count) << "\n";
+}
+
+void PrintRow(ID3D11Device* device, ID3D11DeviceContext* context, Texture& texture, UINT y,
+    UINT x0, UINT x1, const char* name)
+{
+    D3D11_TEXTURE2D_DESC desc = {};
+    texture.tex->GetDesc(&desc);
+
+    D3D11_TEXTURE2D_DESC staging_desc = desc;
+    staging_desc.Usage          = D3D11_USAGE_STAGING;
+    staging_desc.BindFlags      = 0;
+    staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    staging_desc.MiscFlags      = 0;
+
+    ComPtr<ID3D11Texture2D> staging;
+    if (FAILED(device->CreateTexture2D(&staging_desc, nullptr, &staging)))
+        return;
+    context->CopyResource(staging.Get(), texture.tex.Get());
+
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+        return;
+
+    const uint8_t* row = static_cast<const uint8_t*>(mapped.pData) + static_cast<size_t>(y) * mapped.RowPitch;
+    std::cout << "  row " << name << " y=" << y << ":";
+    for (UINT x = x0; x < x1; ++x)
+    {
+        if (desc.Format == DXGI_FORMAT_R16G16_UNORM)
+        {
+            const uint16_t* p = reinterpret_cast<const uint16_t*>(row) + x * 2;
+            std::cout << " " << p[0] << "," << p[1];
+        }
+        else if (desc.Format == DXGI_FORMAT_R16_UNORM)
+        {
+            const uint16_t* p = reinterpret_cast<const uint16_t*>(row) + x;
+            std::cout << " " << p[0];
+        }
+        else if (desc.Format == DXGI_FORMAT_R16G16B16A16_UNORM)
+        {
+            const uint16_t* p = reinterpret_cast<const uint16_t*>(row) + x * 4;
+            std::cout << " " << p[0] << "," << p[1] << "," << p[2];
+        }
+    }
+    std::cout << "\n";
+
+    context->Unmap(staging.Get(), 0);
 }
 
 void WriteBmp(const char* path, const uint8_t* rgba, UINT width, UINT height, UINT pitch)
@@ -647,6 +692,11 @@ int main()
         PrintAverage(device.Get(), context.Get(), textures[pass.rt0], pass.name);
         if (pass.rt1 >= 0)
             PrintAverage(device.Get(), context.Get(), textures[pass.rt1], "PhosphorBlue");
+        if (std::strcmp(pass.name, "PhosphorLookup") == 0)
+        {
+            PrintRow(device.Get(), context.Get(), textures[T_PHOSPHOR_MASK], 500, 780, 800, "PhosphorMask");
+            PrintRow(device.Get(), context.Get(), textures[T_BEAM_CONVERGENCE], 500, 780, 800, "Beams");
+        }
         if (std::strcmp(pass.name, "Output") == 0)
             SaveTextureBmp(device.Get(), context.Get(), textures[T_OUTPUT], "output.bmp");
     }

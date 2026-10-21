@@ -725,6 +725,8 @@ int main()
         PrintAverage(device.Get(), context.Get(), textures[pass.rt0], pass.name);
         if (pass.rt1 >= 0)
             PrintAverage(device.Get(), context.Get(), textures[pass.rt1], "PhosphorBlue");
+        if (std::strcmp(pass.name, "Mask") == 0)
+            PrintRow(device.Get(), context.Get(), textures[T_MASKED], 500, 780, 800, "Masked");
         if (std::strcmp(pass.name, "PhosphorLookup") == 0)
         {
             PrintRow(device.Get(), context.Get(), textures[T_PHOSPHOR_MASK], 500, 780, 800, "PhosphorMask");

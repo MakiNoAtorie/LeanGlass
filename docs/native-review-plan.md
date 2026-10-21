@@ -34,6 +34,16 @@ fixes land.
   a target nothing sampled.
 - [x] **P2 — unused preblur textures.** Removed (preblur is compiled out).
 
+## Fixed in v0.2.2
+
+- [x] Native FPS is counted again; the title shows `LeanGlass native (Retro, ~Nfps)`.
+- [x] Native mode forces the Retro radio and ignores a saved Off/preset state, so
+  the menu no longer claims a preset the renderer is not drawing.
+- [x] Win32 link dependencies include `d3dcompiler.lib` and `dxguid.lib`.
+- [x] CI cleans both stage directories, asserts the native zip's exact five
+  files, checks the HLSL size, rejects ReShade leakage, and fails the artifact
+  upload when a zip is missing.
+
 ## Next: correctness and parity
 
 - [ ] Run LeanCRT's real `Output` pass (`leanOutputVS`/`leanOutputPS`) instead

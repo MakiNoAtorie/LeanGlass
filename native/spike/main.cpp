@@ -546,7 +546,9 @@ int main()
     };
 
     const float clear[4] = { 0, 0, 0, 1 };
-    UINT frame = 1;
+    // BeamDist is rebuilt every 60 frames (or while the ReShade overlay is up).
+    // Use a multiple of 60 so a single-frame still gets a populated LUT.
+    UINT frame = 60;
     UploadFrameCount(context.Get(), frame_cb.Get(), frame);
 
     PrintAverage(device.Get(), context.Get(), textures[T_INPUT], "Input");

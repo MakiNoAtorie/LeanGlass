@@ -1,0 +1,31 @@
+name: Native spike
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ native-backend ]
+    paths:
+      - 'native/**'
+      - '.github/workflows/native-spike.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build
+        shell: cmd
+        run: cl /nologo /std:c++17 /EHsc /O2 /I native\spike native\spike\main.cpp /Fe:native-spike.exe /link d3d11.lib d3dcompiler.lib
+      - name: Run
+        shell: cmd
+        run: |
+          copy native\spike\LeanCRT.hlsl .
+          .\native-spike.exe
+      - name: Upload image
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-spike
+          path: native-spike.bmp
+          if-no-files-found: warn

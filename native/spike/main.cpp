@@ -266,7 +266,8 @@ void UploadFrameCount(ID3D11DeviceContext* context, ID3D11Buffer* buffer, UINT f
 }
 
 void PrintAverage(ID3D11Device* device, ID3D11DeviceContext* context, Texture& texture, const char* name)
-{    D3D11_TEXTURE2D_DESC desc = {};
+{
+    D3D11_TEXTURE2D_DESC desc = {};
     texture.tex->GetDesc(&desc);
 
     D3D11_TEXTURE2D_DESC staging_desc = desc;
@@ -594,6 +595,35 @@ int main()
         cs_cache[entry] = shader;
         return shader.Get();
     };
+
+    // LeanCRT builds the phosphor mask one 1/64-wide vertical segment per frame.
+    // Run 64 mask-only frames so the still has a complete mask instead of one strip.
+    {
+        ID3D11RenderTargetView* mask_rtvs[2] = {
+            textures[T_PHOSPHOR_MASK].rtv.Get(),
+            textures[T_PHOSPHOR_BLUE].rtv.Get()
+        };
+        context->OMSetRenderTargets(2, mask_rtvs, nullptr);
+
+        D3D11_VIEWPORT viewport = {};
+        viewport.Width    = static_cast<float>(W);
+        viewport.Height   = static_cast<float>(H);
+        viewport.MaxDepth = 1.0f;
+        context->RSSetViewports(1, &viewport);
+        context->IASetInputLayout(nullptr);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+        ID3D11VertexShader* mask_vs = get_vs("F__generatePhosphorMaskVS");
+        ID3D11PixelShader*  mask_ps = get_ps("F__leanPhosphorPS");
+        context->VSSetShader(mask_vs, nullptr, 0);
+        context->PSSetShader(mask_ps, nullptr, 0);
+
+        for (UINT frame_index = 0; frame_index < 64; ++frame_index)
+        {
+            UploadFrameCount(context.Get(), frame_cb.Get(), frame_index);
+            context->Draw(4, 0);
+        }
+    }
 
     auto bind_graphics = [&](const StageBindings& bindings, bool pixel)
     {

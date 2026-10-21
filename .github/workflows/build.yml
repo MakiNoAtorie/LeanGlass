@@ -45,7 +45,8 @@ jobs:
         $nativeStage = "stage-native"
         New-Item -ItemType Directory -Force -Path $nativeStage | Out-Null
         Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\LeanGlass.exe" "$nativeStage\LeanGlass.exe" -Force
-        Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\native" "$nativeStage\native" -Recurse -Force
+        New-Item -ItemType Directory -Force -Path "$nativeStage\native" | Out-Null
+        Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\native\LeanCRT.hlsl" "$nativeStage\native\LeanCRT.hlsl" -Force
         Copy-Item ".\LICENSE" "$nativeStage\ShaderGlass-LICENSE.txt" -Force
         Copy-Item ".\ShaderGlass\leancrt\LeanCRT-LICENSE.txt" "$nativeStage\LeanCRT-LICENSE.txt" -Force
         Copy-Item ".\README-NATIVE.txt" "$nativeStage\README-NATIVE.txt" -Force

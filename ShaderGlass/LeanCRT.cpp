@@ -7,6 +7,7 @@ GNU General Public License v3.0
 #include "pch.h"
 #include "LeanCRT.h"
 
+#include <chrono>
 #include <fstream>
 
 namespace LeanCRT
@@ -46,6 +47,20 @@ namespace
     std::wstring SettingsPath()
     {
         return (DataDir() / L"settings.ini").wstring();
+    }
+
+    // ReShade's ini cache skips a file whose timestamp is not newer than the
+    // cached one. copy_file preserves the source timestamp, so switching from a
+    // newer preset back to an older one would keep the newer preset loaded.
+    // Stamp the active file forward after every copy.
+    void StampNewer(const std::filesystem::path& path)
+    {
+        std::error_code ec;
+        auto now = std::filesystem::file_time_type::clock::now();
+        const auto current = std::filesystem::last_write_time(path, ec);
+        if (!ec && current >= now)
+            now = current + std::chrono::seconds(1);
+        std::filesystem::last_write_time(path, now, ec);
     }
 }
 
@@ -150,6 +165,8 @@ bool EnsureInstalled(std::wstring& error)
             error = L"Could not create " + active.wstring();
             return false;
         }
+
+        StampNewer(active);
     }
 
     return true;
@@ -174,6 +191,7 @@ bool ApplyPreset(Preset preset, std::wstring& error)
         return false;
     }
 
+    StampNewer(active);
     SavePreset(preset);
     return true;
 }

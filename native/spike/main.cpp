@@ -736,10 +736,43 @@ int main()
 
     context->OMSetRenderTargets(0, nullptr, nullptr);
 
-    // Flat-output proof: the raster composite already contains the masked image.
-    // Copy it to the output target while the geometry/output pass is debugged.
-    context->CopyResource(textures[T_OUTPUT].tex.Get(), textures[T_BLOOM_HORIZ].tex.Get());
-    SaveTextureBmp(device.Get(), context.Get(), textures[T_OUTPUT], "flat.bmp");
+    // Flat-output blit: convert the RGBA16 raster composite to the RGBA8 output.
+    // CopyResource cannot change formats, so use a one-quad pixel shader.
+    {
+        static const char* blit_source =
+            "Texture2D<float4> source_texture : register(t18);\n"
+            "SamplerState source_sampler : register(s0);\n"
+            "float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET\n"
+            "{ return float4(source_texture.Sample(source_sampler, uv).rgb, 1.0); }\n";
+
+        ComPtr<ID3DBlob> blit_blob = Compile(blit_source, "main", "ps_5_0");
+        ComPtr<ID3D11PixelShader> blit_ps;
+        Check(device->CreatePixelShader(blit_blob->GetBufferPointer(), blit_blob->GetBufferSize(), nullptr, &blit_ps), "blit ps");
+
+        ID3D11RenderTargetView* out_rtv = textures[T_OUTPUT].rtv.Get();
+        context->OMSetRenderTargets(1, &out_rtv, nullptr);
+        context->ClearRenderTargetView(out_rtv, clear);
+
+        D3D11_VIEWPORT viewport = {};
+        viewport.Width    = static_cast<float>(W);
+        viewport.Height   = static_cast<float>(H);
+        viewport.MaxDepth = 1.0f;
+        context->RSSetViewports(1, &viewport);
+        context->IASetInputLayout(nullptr);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+        context->VSSetShader(get_vs("F__PostProcessVS"), nullptr, 0);
+        context->PSSetShader(blit_ps.Get(), nullptr, 0);
+
+        ID3D11ShaderResourceView* blit_srvs[T_COUNT] = {};
+        blit_srvs[18] = textures[T_BLOOM_HORIZ].srv.Get();
+        ID3D11SamplerState* blit_sampler = sampler_clamp.Get();
+        context->PSSetShaderResources(0, T_COUNT, blit_srvs);
+        context->PSSetSamplers(0, 1, &blit_sampler);
+
+        context->Draw(4, 0);
+        SaveTextureBmp(device.Get(), context.Get(), textures[T_OUTPUT], "flat.bmp");
+    }
 
     D3D11_TEXTURE2D_DESC staging_desc = {};
     textures[T_OUTPUT].tex->GetDesc(&staging_desc);

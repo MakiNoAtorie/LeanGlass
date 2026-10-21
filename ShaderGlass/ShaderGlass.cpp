@@ -11,6 +11,8 @@ GNU General Public License v3.0
 #include "CursorEmulator.h"
 #include "resource.h"
 
+#include <filesystem>
+
 static HRESULT     hr;
 static const float background_colour[4] = {0, 0, 0, 1.0f};
 
@@ -560,6 +562,37 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         // skip
         PresentFrame();
         return;
+    }
+
+    if(m_nativeMode)
+    {
+        if(!m_nativeLeanCRT)
+        {
+            wchar_t modulePath[MAX_PATH] = {};
+            GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+            const auto hlslPath = std::filesystem::path(modulePath).parent_path() / L"native" / L"LeanCRT.hlsl";
+
+            m_nativeLeanCRT = std::make_unique<NativeLeanCRT>();
+            std::wstring nativeError;
+            if(!m_nativeLeanCRT->Initialize(m_device.get(), m_context.get(), hlslPath.wstring(), nativeError))
+            {
+                OutputDebugStringW((L"Native LeanCRT init failed: " + nativeError + L"\n").c_str());
+                m_nativeLeanCRT.reset();
+                m_nativeMode = false;
+            }
+        }
+
+        if(m_nativeLeanCRT && m_displayRenderTarget)
+        {
+            winrt::com_ptr<ID3D11ShaderResourceView> inputView;
+            if(SUCCEEDED(m_device->CreateShaderResourceView(texture.get(), nullptr, inputView.put())))
+            {
+                m_nativeLeanCRT->Render(inputView.get(), m_displayRenderTarget.get(),
+                    static_cast<UINT>(clientRect.right), static_cast<UINT>(clientRect.bottom));
+                PresentFrame();
+                return;
+            }
+        }
     }
 
     auto clientWidth  = clientRect.right;

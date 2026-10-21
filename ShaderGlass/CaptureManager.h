@@ -71,6 +71,7 @@ public:
     void  UpdateOutputFlip();
     void  UpdateShaderPreset();
     void  UpdateFrameSkip();
+    void  SetNativeMode(bool nativeMode);
     bool  UpdateInput();
     void  UpdateCursor();
     void  UpdateLockedArea();
@@ -103,6 +104,7 @@ private:
     winrt::com_ptr<ID3D11Texture2D>                   m_outputTexture {nullptr};
     std::unique_ptr<CaptureSession>                   m_session {nullptr};
     std::unique_ptr<ShaderGlass>                      m_shaderGlass {nullptr};
+    bool                                              m_nativeMode {false};
     std::vector<std::unique_ptr<PresetDef>>           m_presetList;
     std::vector<std::tuple<int, std::string, double>> m_queuedParams;
     std::vector<std::tuple<int, std::string, double>> m_lastParams;

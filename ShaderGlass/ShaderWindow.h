@@ -77,7 +77,8 @@ private:
     bool                          m_browserPositioned {false};
     bool                          m_inMenu {false};
     bool                          m_inDialog {false};
-    bool                          m_firstStart {true};
+    bool         m_firstStart {true};
+    bool         m_nativeMode {false};
     HANDLE                        m_compileThread {nullptr};
     HANDLE                        m_compileEvent {nullptr};
     float                         m_dpiScale {1.0f};

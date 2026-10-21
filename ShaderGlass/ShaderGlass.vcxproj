@@ -137,7 +137,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Delayimp.lib;ShaderGC.lib;mf.lib;mfuuid.lib;Comctl32.lib;dwmapi.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Delayimp.lib;ShaderGC.lib;mf.lib;mfuuid.lib;Comctl32.lib;dwmapi.lib;windowsapp.lib;d3dcompiler.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OutDir);$(SolutionDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <StackReserveSize>4096000</StackReserveSize>
       <DelayLoadDLLs>D3DCOMPILER_47.dll;MF.dll;MFReadWrite.dll;MFPlat.dll</DelayLoadDLLs>
@@ -167,7 +167,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>Delayimp.lib;ShaderGC.lib;mf.lib;mfuuid.lib;Comctl32.lib;dwmapi.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Delayimp.lib;ShaderGC.lib;mf.lib;mfuuid.lib;Comctl32.lib;dwmapi.lib;windowsapp.lib;d3dcompiler.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <AdditionalLibraryDirectories>$(OutDir);$(SolutionDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DelayLoadDLLs>D3DCOMPILER_47.dll;MF.dll;MFReadWrite.dll;MFPlat.dll</DelayLoadDLLs>
@@ -182,6 +182,7 @@
     <ClInclude Include="CursorEmulator.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="LeanCRT.h" />
+    <ClInclude Include="NativeLeanCRT.h" />
     <ClInclude Include="HotkeyDialog.h" />
     <ClInclude Include="InputDialog.h" />
     <ClInclude Include="DeviceCapture.h" />
@@ -222,6 +223,7 @@
     <ClCompile Include="CursorEmulator.cpp" />
     <ClCompile Include="Helpers.cpp" />
     <ClCompile Include="LeanCRT.cpp" />
+    <ClCompile Include="NativeLeanCRT.cpp" />
     <ClCompile Include="HotkeyDialog.cpp" />
     <ClCompile Include="InputDialog.cpp" />
     <ClCompile Include="DeviceCapture.cpp" />
@@ -265,5 +267,8 @@
   </ImportGroup>
   <Target Name="CopyLeanCRT" AfterTargets="Build">
     <Exec Command="xcopy /E /I /Y &quot;$(ProjectDir)leancrt&quot; &quot;$(OutDir)leancrt&quot;" />
+  </Target>
+  <Target Name="CopyNative" AfterTargets="Build">
+    <Exec Command="xcopy /E /I /Y &quot;$(ProjectDir)..\native&quot; &quot;$(OutDir)native&quot;" />
   </Target>
 </Project>

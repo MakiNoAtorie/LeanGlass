@@ -42,9 +42,20 @@ jobs:
 
         Compress-Archive -Path "$stage\*" -DestinationPath "LeanGlass-x64.zip" -Force
 
+        $nativeStage = "stage-native"
+        New-Item -ItemType Directory -Force -Path $nativeStage | Out-Null
+        Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\LeanGlass.exe" "$nativeStage\LeanGlass.exe" -Force
+        Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\native" "$nativeStage\native" -Recurse -Force
+        Copy-Item ".\LICENSE" "$nativeStage\ShaderGlass-LICENSE.txt" -Force
+        Copy-Item ".\ShaderGlass\leancrt\LeanCRT-LICENSE.txt" "$nativeStage\LeanCRT-LICENSE.txt" -Force
+        Copy-Item ".\README-NATIVE.txt" "$nativeStage\README-NATIVE.txt" -Force
+        Compress-Archive -Path "$nativeStage\*" -DestinationPath "LeanGlass-native-x64.zip" -Force
+
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: 'LeanGlass_${{ matrix.platform }}_${{ matrix.configuration }}'
-        path: 'LeanGlass-x64.zip'
+        path: |
+          LeanGlass-x64.zip
+          LeanGlass-native-x64.zip
         overwrite: true

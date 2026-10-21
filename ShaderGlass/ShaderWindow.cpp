@@ -1017,6 +1017,16 @@ void ShaderWindow::BuildLeanCRTMenu()
     AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_RELOAD, L"Reload shader");
     AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_SETUP, L"Setup / troubleshooting...");
     InsertMenuW(m_mainMenu, 4, MF_BYPOSITION | MF_POPUP, (UINT_PTR)m_leanCRTMenu, L"LeanCRT");
+
+    if(m_nativeMode)
+    {
+        // Native backend v1 renders the Retro look only. Preset files and the
+        // ReShade reload path do not apply.
+        for(UINT id = IDM_LEANCRT_ENABLE; id <= IDM_LEANCRT_OFF; ++id)
+            EnableMenuItem(m_leanCRTMenu, id, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_RELOAD, MF_BYCOMMAND | MF_GRAYED);
+    }
+
     UpdateLeanCRTMenu();
 }
 
@@ -1032,6 +1042,14 @@ void ShaderWindow::UpdateLeanCRTMenu()
 
 void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
 {
+    if(m_nativeMode)
+    {
+        m_leanCRTPreset  = preset;
+        m_leanCRTEnabled = preset != LeanCRT::Preset::Off;
+        UpdateLeanCRTMenu();
+        return;
+    }
+
     std::wstring error;
     if(!LeanCRT::ApplyPreset(preset, error))
     {
@@ -2507,6 +2525,7 @@ bool ShaderWindow::Start()
         EnableMenuItem(m_programMenu, IDM_STOP, MF_BYCOMMAND | MF_ENABLED);
         UpdateGPUName();
         m_firstStart = false;
+        m_captureManager.SetNativeMode(m_nativeMode);
     }
     else
     {
@@ -2632,6 +2651,8 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     m_helpMenu    = GetSubMenu(m_mainMenu, 4);
 
     std::wstring leanError;
+    // No ReShade DLL means the native backend is the intended path.
+    m_nativeMode = !std::filesystem::exists(LeanCRT::AppDir() / L"dxgi.dll");
     if (!LeanCRT::EnsureInstalled(leanError))
         m_leanCRTError = leanError;
 
@@ -3280,6 +3301,8 @@ void ShaderWindow::Start(_In_ LPWSTR lpCmdLine, HWND paramsWindow, HWND browserW
             }
             else if(wcscmp(args[a], L"-autoclose") == 0 || wcscmp(args[a], L"-ac") == 0)
                 m_captureOptions.autoClose = true;
+            else if(wcscmp(args[a], L"-native") == 0)
+                m_nativeMode = true;
             else if(a == numArgs - 1)
             {
                 std::wstring ws(args[a]);

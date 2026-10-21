@@ -156,6 +156,7 @@ bool CaptureManager::StartSession()
     UpdateFrameSkip();
     UpdateLockedArea();
     UpdateCroppedArea();
+    m_shaderGlass->SetNativeMode(m_nativeMode);
     UpdateVertical();
 
     if(m_options.imageFile.size())
@@ -431,6 +432,15 @@ void CaptureManager::UpdateFrameSkip()
     if(m_shaderGlass)
     {
         m_shaderGlass->SetFrameSkip(m_options.frameSkip);
+    }
+}
+
+void CaptureManager::SetNativeMode(bool nativeMode)
+{
+    m_nativeMode = nativeMode;
+    if(m_shaderGlass)
+    {
+        m_shaderGlass->SetNativeMode(nativeMode);
     }
 }
 

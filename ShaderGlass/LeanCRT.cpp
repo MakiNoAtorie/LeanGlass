@@ -116,6 +116,20 @@ bool EnsureInstalled(std::wstring& error)
     const auto data = DataDir();
     const auto shader = data / L"Shaders" / L"LeanCRT.fx";
 
+    // Native backend: no ReShade DLL or .ini files are needed. The generated
+    // HLSL next to the executable is the whole shader dependency.
+    if (!std::filesystem::exists(app / L"dxgi.dll", ec))
+    {
+        const auto nativeShader = app / L"native" / L"LeanCRT.hlsl";
+        if (!std::filesystem::exists(nativeShader, ec))
+        {
+            error = L"LeanGlass native shaders not found:\n" + nativeShader.wstring() +
+                L"\n\nThe native build ships them in the native folder next to LeanGlass.exe.";
+            return false;
+        }
+        return true;
+    }
+
     if (!std::filesystem::exists(shader, ec))
     {
         error = L"LeanCRT shaders not found:\n" + shader.wstring() +

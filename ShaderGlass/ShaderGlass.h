@@ -9,6 +9,7 @@ GNU General Public License v3.0
 
 #include "Preset.h"
 #include "ShaderPass.h"
+#include "NativeLeanCRT.h"
 #include "Shaders\PreprocessShaderDef.h"
 #include "Shaders\PassthroughShaderDef.h"
 #include "Shaders\PassthroughPresetDef.h"
@@ -34,6 +35,10 @@ public:
     void  SetOutputScale(float w, float h);
     void  SetOutputFlip(bool h, bool v);
     void  SetShaderPreset(PresetDef* p, const std::vector<std::tuple<int, std::string, double>>& params);
+    void  SetNativeMode(bool nativeMode)
+    {
+        m_nativeMode = nativeMode;
+    }
     void  SetFrameSkip(int s);
     void  SetLockedArea(RECT area);
     void  SetCroppedArea(RECT area);
@@ -116,6 +121,8 @@ private:
     ShaderPass                                        m_preprocessPass;
     std::unique_ptr<Preset>                           m_shaderPreset {nullptr};
     std::unique_ptr<Preset>                           m_newShaderPreset {nullptr};
+    std::unique_ptr<NativeLeanCRT>                    m_nativeLeanCRT {nullptr};
+    bool                                              m_nativeMode {false};
     std::vector<std::tuple<int, std::string, double>> m_newParams;
 
     volatile int   m_frameSkip {0};

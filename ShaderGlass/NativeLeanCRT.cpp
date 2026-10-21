@@ -400,6 +400,31 @@ bool NativeLeanCRT::Initialize(ID3D11Device* device, ID3D11DeviceContext* contex
         return false;
     }
 
+    const char* bypass_source =
+        "Texture2D<float4> source_texture : register(t0);\n"
+        "SamplerState source_sampler : register(s0);\n"
+        "float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET\n"
+        "{ return float4(source_texture.Sample(source_sampler, uv).rgb, 1.0); }\n";
+
+    ComPtr<ID3DBlob> bypass_blob;
+    hr = D3DCompile(bypass_source, std::strlen(bypass_source), "LeanCRTBypass.hlsl", nullptr, nullptr,
+        "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &bypass_blob, &blit_errors);
+    if (FAILED(hr) || !bypass_blob)
+    {
+        error = L"Bypass shader compilation failed: " + HResultText(hr);
+        if (blit_errors)
+            error += L"\n" + std::wstring(static_cast<const char*>(blit_errors->GetBufferPointer()),
+                static_cast<const char*>(blit_errors->GetBufferPointer()) + blit_errors->GetBufferSize());
+        return false;
+    }
+
+    hr = m_device->CreatePixelShader(bypass_blob->GetBufferPointer(), bypass_blob->GetBufferSize(), nullptr, &m_bypass_ps);
+    if (FAILED(hr))
+    {
+        error = L"Bypass pixel shader creation failed: " + HResultText(hr);
+        return false;
+    }
+
     // Compile everything once so a later frame cannot stall on a missing entry point.
     const char* vs_entries[] = {
         "F__calculateBeamDistsVS", "F__leanCachedBeamVS", "F__PostProcessVS", "F__blurVerticalVS",
@@ -477,6 +502,12 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
 {
     if (!m_ready || !input || !output)
         return;
+
+    if (!m_enabled)
+    {
+        RenderBypass(input, output, outputWidth, outputHeight);
+        return;
+    }
 
     m_textures[T_INPUT].srv = input;
     const UINT frame = m_frame++;
@@ -579,6 +610,47 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
 
     // Do not keep the capture texture alive between frames.
     m_textures[T_INPUT].srv = nullptr;
+}
+
+void NativeLeanCRT::RenderBypass(ID3D11ShaderResourceView* input, ID3D11RenderTargetView* output, UINT outputWidth, UINT outputHeight)
+{
+    ID3D11RenderTargetView* backbuffer = output;
+    m_context->OMSetRenderTargets(1, &backbuffer, nullptr);
+
+    D3D11_VIEWPORT viewport = {};
+    viewport.Width    = static_cast<float>(outputWidth);
+    viewport.Height   = static_cast<float>(outputHeight);
+    viewport.MaxDepth = 1.0f;
+    m_context->RSSetViewports(1, &viewport);
+    m_context->IASetInputLayout(nullptr);
+    m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    m_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+    m_context->OMSetDepthStencilState(nullptr, 0);
+    m_context->RSSetState(m_rasterizer.Get());
+
+    std::wstring error;
+    ComPtr<ID3D11VertexShader> vs = GetVS("F__PostProcessVS", error);
+    if (!vs || !m_bypass_ps)
+        return;
+
+    m_context->VSSetShader(vs.Get(), nullptr, 0);
+    m_context->PSSetShader(m_bypass_ps.Get(), nullptr, 0);
+
+    ID3D11ShaderResourceView* srvs[T_COUNT] = {};
+    srvs[T_INPUT] = input;
+    ID3D11SamplerState* sampler = m_sampler_clamp.Get();
+    m_context->PSSetShaderResources(0, T_COUNT, srvs);
+    m_context->PSSetSamplers(0, 1, &sampler);
+    m_context->Draw(4, 0);
+
+    ID3D11RenderTargetView* null_rtv = nullptr;
+    m_context->OMSetRenderTargets(1, &null_rtv, nullptr);
+    ID3D11ShaderResourceView* null_srvs[T_COUNT] = {};
+    m_context->PSSetShaderResources(0, T_COUNT, null_srvs);
+    m_context->VSSetShaderResources(0, T_COUNT, null_srvs);
+    ID3D11SamplerState* null_samplers[3] = {};
+    m_context->PSSetSamplers(0, 3, null_samplers);
+    m_context->VSSetSamplers(0, 3, null_samplers);
 }
 
 void NativeLeanCRT::Shutdown()

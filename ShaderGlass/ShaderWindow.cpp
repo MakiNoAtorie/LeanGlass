@@ -1020,11 +1020,14 @@ void ShaderWindow::BuildLeanCRTMenu()
 
     if(m_nativeMode)
     {
-        // Native backend v1 renders the Retro look only. Preset files and the
-        // ReShade reload path do not apply.
-        for(UINT id = IDM_LEANCRT_ENABLE; id <= IDM_LEANCRT_OFF; ++id)
-            EnableMenuItem(m_leanCRTMenu, id, MF_BYCOMMAND | MF_GRAYED);
-        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_RELOAD, MF_BYCOMMAND | MF_GRAYED);
+        // Native backend v1 renders the Retro look only. Keep Enabled, Retro,
+        // Off, Reload and Setup usable; gray only the presets that need the
+        // ReShade preset files.
+        InsertMenuW(m_leanCRTMenu, 2, MF_BYPOSITION | MF_STRING | MF_GRAYED, 0, L"Native backend - Retro only");
+        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_RETRO43, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_MODERN, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_MODERN43, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_ARCADE, MF_BYCOMMAND | MF_GRAYED);
     }
 
     UpdateLeanCRTMenu();
@@ -1057,8 +1060,17 @@ void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
 {
     if(m_nativeMode)
     {
+        if(preset != LeanCRT::Preset::Retro && preset != LeanCRT::Preset::Off)
+        {
+            UpdateLeanCRTMenu();
+            return;
+        }
+
         m_leanCRTPreset  = preset;
         m_leanCRTEnabled = preset != LeanCRT::Preset::Off;
+        if(m_leanCRTEnabled)
+            m_lastLeanCRTPreset = LeanCRT::Preset::Retro;
+        m_captureManager.SetNativeEnabled(m_leanCRTEnabled);
         UpdateLeanCRTMenu();
         return;
     }
@@ -1083,6 +1095,12 @@ void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
 
 void ShaderWindow::ReloadLeanCRT()
 {
+    if(m_nativeMode)
+    {
+        m_captureManager.ReloadNative();
+        return;
+    }
+
     // In glass mode the game keeps keyboard focus, so SendInput never reaches
     // ReShade inside this window. Post the hotkey directly to our own window:
     // ReShade's input hook sees it regardless of focus. The key-ups are delayed
@@ -2693,6 +2711,8 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
         m_leanCRTPreset = LeanCRT::Preset::Retro;
     m_leanCRTEnabled = m_nativeMode || m_leanCRTPreset != LeanCRT::Preset::Off;
     m_lastLeanCRTPreset = m_leanCRTEnabled ? m_leanCRTPreset : LeanCRT::Preset::Retro;
+    if(m_nativeMode)
+        m_captureManager.SetNativeEnabled(m_leanCRTEnabled);
 
     BuildProgramMenu();
     BuildInputMenu();

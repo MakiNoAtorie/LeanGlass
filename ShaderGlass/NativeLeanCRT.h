@@ -15,6 +15,7 @@ class NativeLeanCRT
 public:
     bool Initialize(ID3D11Device* device, ID3D11DeviceContext* context, const std::wstring& hlslPath, std::wstring& error);
     void Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetView* output, UINT outputWidth, UINT outputHeight);
+    void SetEnabled(bool enabled) { m_enabled = enabled; }
     void Shutdown();
     bool IsReady() const { return m_ready; }
 
@@ -51,6 +52,7 @@ private:
     Texture  CreateTexture(UINT w, UINT h, DXGI_FORMAT format, UINT bind);
     void     BindGraphics(const Bindings& bindings, bool pixel);
     void     RunMaskPrewarm();
+    void     RenderBypass(ID3D11ShaderResourceView* input, ID3D11RenderTargetView* output, UINT outputWidth, UINT outputHeight);
 
     Microsoft::WRL::ComPtr<ID3D11Device>        m_device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
@@ -64,6 +66,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_rasterizer;
     Microsoft::WRL::ComPtr<ID3D11Buffer>       m_frame_cb;
     Microsoft::WRL::ComPtr<ID3D11PixelShader>  m_blit_ps;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader>  m_bypass_ps;
 
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11VertexShader>> m_vs;
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11PixelShader>>  m_ps;
@@ -72,4 +75,5 @@ private:
 
     UINT m_frame = 60;
     bool m_ready = false;
+    bool m_enabled = true;
 };

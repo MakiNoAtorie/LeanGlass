@@ -32,6 +32,23 @@ bool ShaderGlass::TakeNativeError(std::wstring& error)
     return true;
 }
 
+void ShaderGlass::SetNativeEnabled(bool enabled)
+{
+    m_nativeEnabled = enabled;
+    if(m_nativeLeanCRT)
+        m_nativeLeanCRT->SetEnabled(enabled);
+}
+
+void ShaderGlass::ReloadNative()
+{
+    std::lock_guard lock(m_mutex);
+    m_nativeLeanCRT.reset();
+    {
+        std::lock_guard errorLock(m_nativeErrorMutex);
+        m_nativeError.clear();
+    }
+}
+
 ShaderGlass::~ShaderGlass()
 {
     std::unique_lock lock(m_mutex);
@@ -600,7 +617,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
             GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
             const auto hlslPath = std::filesystem::path(modulePath).parent_path() / L"native" / L"LeanCRT.hlsl";
 
-            m_nativeLeanCRT = std::make_unique<NativeLeanCRT>();
+                m_nativeLeanCRT = std::make_unique<NativeLeanCRT>();
             std::wstring nativeError;
             if(!m_nativeLeanCRT->Initialize(m_device.get(), m_context.get(), hlslPath.wstring(), nativeError))
             {
@@ -611,6 +628,10 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
                 }
                 m_nativeLeanCRT.reset();
                 m_nativeMode = false;
+            }
+            else
+            {
+                m_nativeLeanCRT->SetEnabled(m_nativeEnabled);
             }
         }
 

@@ -39,6 +39,8 @@ public:
     {
         m_nativeMode = nativeMode;
     }
+    void  SetNativeEnabled(bool enabled);
+    void  ReloadNative();
     bool  TakeNativeError(std::wstring& error);
     void  SetFrameSkip(int s);
     void  SetLockedArea(RECT area);
@@ -125,6 +127,7 @@ private:
     std::unique_ptr<Preset>                           m_newShaderPreset {nullptr};
     std::unique_ptr<NativeLeanCRT>                    m_nativeLeanCRT {nullptr};
     bool                                              m_nativeMode {false};
+    bool                                              m_nativeEnabled {true};
     std::mutex                                        m_nativeErrorMutex;
     std::wstring                                      m_nativeError;
     std::vector<std::tuple<int, std::string, double>> m_newParams;

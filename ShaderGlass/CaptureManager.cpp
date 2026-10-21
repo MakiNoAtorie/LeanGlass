@@ -157,6 +157,7 @@ bool CaptureManager::StartSession()
     UpdateLockedArea();
     UpdateCroppedArea();
     m_shaderGlass->SetNativeMode(m_nativeMode);
+    m_shaderGlass->SetNativeEnabled(m_nativeEnabled);
     UpdateVertical();
 
     if(m_options.imageFile.size())
@@ -441,7 +442,21 @@ void CaptureManager::SetNativeMode(bool nativeMode)
     if(m_shaderGlass)
     {
         m_shaderGlass->SetNativeMode(nativeMode);
+        m_shaderGlass->SetNativeEnabled(m_nativeEnabled);
     }
+}
+
+void CaptureManager::SetNativeEnabled(bool enabled)
+{
+    m_nativeEnabled = enabled;
+    if(m_shaderGlass)
+        m_shaderGlass->SetNativeEnabled(enabled);
+}
+
+void CaptureManager::ReloadNative()
+{
+    if(m_shaderGlass)
+        m_shaderGlass->ReloadNative();
 }
 
 bool CaptureManager::TakeNativeError(std::wstring& error)

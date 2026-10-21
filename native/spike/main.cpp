@@ -618,6 +618,10 @@ int main()
         context->VSSetShader(mask_vs, nullptr, 0);
         context->PSSetShader(mask_ps, nullptr, 0);
 
+        ID3D11Buffer* mask_cb = frame_cb.Get();
+        context->VSSetConstantBuffers(0, 1, &mask_cb);
+        context->PSSetConstantBuffers(0, 1, &mask_cb);
+
         for (UINT frame_index = 0; frame_index < 64; ++frame_index)
         {
             UploadFrameCount(context.Get(), frame_cb.Get(), frame_index);

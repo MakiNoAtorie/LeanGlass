@@ -925,6 +925,10 @@ void ShaderWindow::BuildProgramMenu()
     m_hotkeysMenu  = GetSubMenu(m_programMenu, 3);
     m_gpuMenu      = GetSubMenu(m_programMenu, 8);
     m_advancedMenu = GetSubMenu(m_programMenu, 11);
+    if(m_nativeMode)
+    {
+        EnableMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
+    }
     if(!HasCaptureAPI())
     {
         EnableMenuItem(m_programMenu, 11, MF_BYPOSITION | MF_DISABLED | MF_GRAYED);
@@ -1964,6 +1968,10 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             }
             break;
         case ID_ADVANCED_USEHDR:
+            if(m_nativeMode)
+            {
+                break;
+            }
             if(GetMenuState(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND) & MF_CHECKED)
             {
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_UNCHECKED);

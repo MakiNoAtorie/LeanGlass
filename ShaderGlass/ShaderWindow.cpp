@@ -1150,9 +1150,10 @@ void ShaderWindow::ShowLeanCRTSetupInfo()
     {
         std::wstring message =
             L"LeanGlass is using the native LeanCRT backend.\n\n"
-            L"Required: native\\LeanCRT.hlsl next to LeanGlass.exe.\n"
+            L"Required: the native\\LeanCRT*.hlsl files next to LeanGlass.exe.\n"
             L"This build has no dxgi.dll and no ReShade.ini.\n\n"
-            L"Native v1 renders the Retro look at 1080p internally. Presets, 4:3 and Arcade come next.";
+            L"Native renders at 1920x1080 internally and compiles one HLSL per preset. "
+            L"Retro 4:3 and Modern 4:3 keep a 4:3 window; Arcade runs the Output/geometry pass.";
         if(!m_leanCRTError.empty())
             message += L"\n\nLast error:\n" + m_leanCRTError;
         MessageBoxW(m_mainWindow, message.c_str(), L"LeanCRT (native)", MB_OK | MB_ICONINFORMATION);

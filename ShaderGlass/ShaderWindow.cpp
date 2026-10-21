@@ -1546,15 +1546,19 @@ void ShaderWindow::UpdateTitle()
                      inFPSdisplay,
                      outFPS,
                      advancedFlags);
+        if(m_nativeMode)
+        {
+            _snwprintf_s(title, 200, _T("LeanGlass native (Retro, %s~%dfps)"), windowName, outFPS);
+        }
         SetWindowTextW(m_mainWindow, title);
     }
     else if(m_firstStart)
     {
-        SetWindowTextW(m_mainWindow, _T("ShaderGlass (no input selected)"));
+        SetWindowTextW(m_mainWindow, m_nativeMode ? _T("LeanGlass native (no input selected)") : _T("ShaderGlass (no input selected)"));
     }
     else
     {
-        SetWindowTextW(m_mainWindow, _T("ShaderGlass (stopped)"));
+        SetWindowTextW(m_mainWindow, m_nativeMode ? _T("LeanGlass native (stopped)") : _T("ShaderGlass (stopped)"));
     }
 }
 
@@ -2685,7 +2689,9 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     m_captureManager.SetNativeMode(m_nativeMode);
 
     m_leanCRTPreset = LeanCRT::LoadSavedPreset();
-    m_leanCRTEnabled = m_leanCRTPreset != LeanCRT::Preset::Off;
+    if(m_nativeMode)
+        m_leanCRTPreset = LeanCRT::Preset::Retro;
+    m_leanCRTEnabled = m_nativeMode || m_leanCRTPreset != LeanCRT::Preset::Off;
     m_lastLeanCRTPreset = m_leanCRTEnabled ? m_leanCRTPreset : LeanCRT::Preset::Retro;
 
     BuildProgramMenu();

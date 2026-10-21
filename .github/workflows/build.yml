@@ -30,6 +30,7 @@ jobs:
       shell: pwsh
       run: |
         $stage = "stage"
+        Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force -Path $stage | Out-Null
         Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\LeanGlass.exe" "$stage\LeanGlass.exe" -ErrorAction Stop
         Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\leancrt" "$stage\leancrt" -Recurse -Force
@@ -43,6 +44,7 @@ jobs:
         Compress-Archive -Path "$stage\*" -DestinationPath "LeanGlass-x64.zip" -Force
 
         $nativeStage = "stage-native"
+        Remove-Item -Recurse -Force $nativeStage -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force -Path $nativeStage | Out-Null
         Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\LeanGlass.exe" "$nativeStage\LeanGlass.exe" -Force
         New-Item -ItemType Directory -Force -Path "$nativeStage\native" | Out-Null
@@ -52,6 +54,25 @@ jobs:
         Copy-Item ".\README-NATIVE.txt" "$nativeStage\README-NATIVE.txt" -Force
         Compress-Archive -Path "$nativeStage\*" -DestinationPath "LeanGlass-native-x64.zip" -Force
 
+        $expectedNative = @(
+          'LeanGlass.exe',
+          'native\LeanCRT.hlsl',
+          'ShaderGlass-LICENSE.txt',
+          'LeanCRT-LICENSE.txt',
+          'README-NATIVE.txt'
+        ) | Sort-Object
+        $root = (Resolve-Path $nativeStage).Path
+        $actualNative = Get-ChildItem $nativeStage -Recurse -File | ForEach-Object {
+          $_.FullName.Substring($root.Length + 1)
+        } | Sort-Object
+        $diff = Compare-Object $expectedNative $actualNative
+        if($diff) { throw "Native package contents changed: $($diff | Out-String)" }
+        if((Get-Item "$nativeStage\native\LeanCRT.hlsl").Length -lt 100000) { throw "Native HLSL is suspiciously small" }
+        $bad = Get-ChildItem $nativeStage -Recurse | Where-Object {
+          $_.Name -match '^(dxgi\.dll|ReShade\.ini)$' -or $_.FullName -match '\\leancrt\\'
+        }
+        if($bad) { throw "Native package contains ReShade files: $($bad | Out-String)" }
+
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -59,4 +80,5 @@ jobs:
         path: |
           LeanGlass-x64.zip
           LeanGlass-native-x64.zip
+        if-no-files-found: error
         overwrite: true

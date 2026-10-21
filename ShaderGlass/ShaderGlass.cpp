@@ -411,6 +411,22 @@ void ShaderGlass::DestroyPasses()
     m_requiresHistory  = 0;
 }
 
+void ShaderGlass::FinishFrame()
+{
+    PresentFrame();
+
+    m_renderCounter++;
+    m_prevRenderTicks = GetTickCount64();
+    if(m_prevRenderTicks - m_prevTicks > 1000)
+    {
+        auto deltaTicks     = m_prevRenderTicks - m_prevTicks;
+        auto deltaFrames    = m_renderCounter - m_prevRenderCounter;
+        m_fps               = deltaFrames * 1000.0f / deltaTicks;
+        m_prevRenderCounter = m_renderCounter;
+        m_prevTicks         = m_prevRenderTicks;
+    }
+}
+
 void ShaderGlass::PresentFrame()
 {
     UINT presentFlags = 0;
@@ -605,7 +621,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
             {
                 m_nativeLeanCRT->Render(inputView.get(), m_displayRenderTarget.get(),
                     static_cast<UINT>(clientRect.right), static_cast<UINT>(clientRect.bottom));
-                PresentFrame();
+                FinishFrame();
                 return;
             }
 
@@ -1218,18 +1234,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         }
     }
 
-    PresentFrame();
-
-    m_renderCounter++;
-    m_prevRenderTicks = GetTickCount64();
-    if(m_prevRenderTicks - m_prevTicks > 1000)
-    {
-        auto deltaTicks     = m_prevRenderTicks - m_prevTicks;
-        auto deltaFrames    = m_renderCounter - m_prevRenderCounter;
-        m_fps               = deltaFrames * 1000.0f / deltaTicks;
-        m_prevRenderCounter = m_renderCounter;
-        m_prevTicks         = m_prevRenderTicks;
-    }
+    FinishFrame();
 }
 
 winrt::com_ptr<ID3D11Texture2D> ShaderGlass::GrabOutput()

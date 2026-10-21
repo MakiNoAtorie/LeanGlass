@@ -65,6 +65,7 @@ private:
     void DestroyTargets();
     void RebuildShaders();
     void PresentFrame();
+    void FinishFrame();
 
     POINT                                    m_lastSize;
     POINT                                    m_lastPos;

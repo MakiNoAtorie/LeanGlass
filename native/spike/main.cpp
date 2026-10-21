@@ -232,7 +232,9 @@ StageBindings Reflect(ID3DBlob* blob, const Texture* textures, ID3D11SamplerStat
         D3D11_SHADER_INPUT_BIND_DESC bind = {};
         Check(reflection->GetResourceBindingDesc(i, &bind), "GetResourceBindingDesc");
 
-        if (std::strstr(bind.Name, "samplerFinal") != nullptr)
+        if (std::strstr(bind.Name, "samplerFinal") != nullptr ||
+            std::strstr(bind.Name, "Phosphor") != nullptr ||
+            std::strstr(bind.Name, "BeamConvergence") != nullptr)
             std::cout << "  binding " << bind.Name << " -> t" << bind.BindPoint << "\n";
 
         switch (bind.Type)

@@ -736,6 +736,11 @@ int main()
 
     context->OMSetRenderTargets(0, nullptr, nullptr);
 
+    // Flat-output proof: the raster composite already contains the masked image.
+    // Copy it to the output target while the geometry/output pass is debugged.
+    context->CopyResource(textures[T_OUTPUT].tex.Get(), textures[T_BLOOM_HORIZ].tex.Get());
+    SaveTextureBmp(device.Get(), context.Get(), textures[T_OUTPUT], "flat.bmp");
+
     D3D11_TEXTURE2D_DESC staging_desc = {};
     textures[T_OUTPUT].tex->GetDesc(&staging_desc);
     staging_desc.Usage          = D3D11_USAGE_STAGING;

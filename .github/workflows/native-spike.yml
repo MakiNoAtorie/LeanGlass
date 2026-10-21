@@ -30,4 +30,5 @@ jobs:
           path: |
             native-spike.bmp
             output.bmp
+            flat.bmp
           if-no-files-found: warn

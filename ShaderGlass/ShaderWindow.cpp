@@ -1158,7 +1158,7 @@ void ShaderWindow::ShowLeanCRTSetupInfo()
             L"Required: the native\\LeanCRT*.hlsl files next to LeanGlass.exe.\n"
             L"This build has no dxgi.dll and no ReShade.ini.\n\n"
             L"Native renders at 1920x1080 internally and compiles one HLSL per preset. "
-            L"Retro 4:3 and Modern 4:3 keep a 4:3 window and read the center 1440x1080 content box of a 16:9 source. "
+            L"Retro 4:3 and Modern 4:3 use a 4:3 content area and read the center 1440x1080 content box of a 16:9 source. "
             L"Arcade runs the Output/geometry pass.";
         if(!m_leanCRTError.empty())
             message += L"\n\nLast error:\n" + m_leanCRTError;
@@ -1513,6 +1513,11 @@ double ShaderWindow::ContentAspect()
 
 void ShaderWindow::ApplyProportionalSizing(RECT* rect, WPARAM edge)
 {
+    // Free and Stretch let the user choose the window shape; native letterboxes
+    // or stretches to it in the final blit.
+    if(m_captureOptions.freeScale || m_captureOptions.aspectRatio <= 0)
+        return;
+
     const double aspect = ContentAspect();
     if(edge < WMSZ_LEFT || edge > WMSZ_BOTTOMRIGHT || aspect <= 0)
         return;
@@ -1612,7 +1617,7 @@ void ShaderWindow::ApplyProportionalSizing(RECT* rect, WPARAM edge)
 
 void ShaderWindow::ResizeToContentAspect(HWND hWnd)
 {
-    if(!hWnd || m_isBorderless || IsZoomed(hWnd))
+    if(!hWnd || m_isBorderless || IsZoomed(hWnd) || m_captureOptions.freeScale)
         return;
     if(!(GetWindowLong(hWnd, GWL_STYLE) & WS_THICKFRAME))
         return;

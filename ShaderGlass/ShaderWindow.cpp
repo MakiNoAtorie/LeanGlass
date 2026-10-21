@@ -1052,6 +1052,8 @@ void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
 void ShaderWindow::CaptureForegroundWindow()
 {
     HWND foreground = GetForegroundWindow();
+    if(foreground == m_mainWindow)
+        foreground = m_lastExternalForeground;
     if(!foreground || foreground == m_mainWindow)
     {
         MessageBoxW(m_mainWindow, L"Focus the game window first, then pick this again.", L"LeanCRT", MB_OK | MB_ICONINFORMATION);
@@ -2445,6 +2447,13 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             UpdateTitle();
             CheckAutoClose();
             return 0;
+        case TIMER_LEANCRT:
+        {
+            HWND foreground = GetForegroundWindow();
+            if(foreground && foreground != m_mainWindow)
+                m_lastExternalForeground = foreground;
+            return 0;
+        }
         }
         break;
     case WM_DESTROY:
@@ -2618,6 +2627,7 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     BuildShaderMenu();
     BuildLeanCRTMenu();
     ScanDisplays();
+    SetTimer(m_mainWindow, TIMER_LEANCRT, 250, NULL);
 
     if(!HasCaptureAPI())
     {

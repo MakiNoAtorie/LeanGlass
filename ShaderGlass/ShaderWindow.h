@@ -10,6 +10,7 @@ GNU General Public License v3.0
 #define MAX_LOADSTRING 100
 #define MENU_FADE_DELAY 1000
 #define CUSTOM_PARAM_SCALE 1000
+#define TIMER_LEANCRT 1
 
 #include "Options.h"
 #include "CaptureManager.h"
@@ -95,6 +96,7 @@ private:
     LeanCRT::Preset               m_lastLeanCRTPreset {LeanCRT::Preset::Retro};
     bool                          m_leanCRTEnabled {true};
     std::wstring                  m_leanCRTError;
+    HWND                          m_lastExternalForeground {nullptr};
 
     bool         LoadProfile(const std::wstring& fileName, bool forceStart = false, const std::wstring& overrideInput = std::wstring());
     void         LoadProfile();

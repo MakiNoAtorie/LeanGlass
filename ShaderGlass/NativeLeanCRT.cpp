@@ -503,7 +503,7 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
     if (!m_ready || !input || !output)
         return;
 
-    if (!m_enabled)
+    if (!m_enabled.load(std::memory_order_relaxed))
     {
         RenderBypass(input, output, outputWidth, outputHeight);
         return;

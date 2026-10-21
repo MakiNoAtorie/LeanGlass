@@ -34,33 +34,21 @@ bool ShaderGlass::TakeNativeError(std::wstring& error)
 
 void ShaderGlass::SetNativeEnabled(bool enabled)
 {
-    m_nativeEnabled = enabled;
-    if(m_nativeLeanCRT)
-        m_nativeLeanCRT->SetEnabled(enabled);
+    m_nativeEnabled.store(enabled, std::memory_order_relaxed);
 }
 
 void ShaderGlass::SetNativePreset(int preset)
 {
-    std::lock_guard lock(m_mutex);
-    if(m_nativePreset == preset)
+    if(m_nativePreset.load(std::memory_order_relaxed) == preset)
         return;
 
-    m_nativePreset = preset;
-    m_nativeLeanCRT.reset();
-    {
-        std::lock_guard errorLock(m_nativeErrorMutex);
-        m_nativeError.clear();
-    }
+    m_nativePreset.store(preset, std::memory_order_relaxed);
+    m_nativeResetPending.store(true, std::memory_order_release);
 }
 
 void ShaderGlass::ReloadNative()
 {
-    std::lock_guard lock(m_mutex);
-    m_nativeLeanCRT.reset();
-    {
-        std::lock_guard errorLock(m_nativeErrorMutex);
-        m_nativeError.clear();
-    }
+    m_nativeResetPending.store(true, std::memory_order_release);
 }
 
 ShaderGlass::~ShaderGlass()
@@ -625,12 +613,22 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
 
     if(m_nativeMode)
     {
+        if(m_nativeResetPending.exchange(false, std::memory_order_acq_rel))
+        {
+            m_nativeLeanCRT.reset();
+            std::lock_guard lock(m_nativeErrorMutex);
+            m_nativeError.clear();
+        }
+
+        const int  nativePreset  = m_nativePreset.load(std::memory_order_relaxed);
+        const bool nativeEnabled = m_nativeEnabled.load(std::memory_order_relaxed);
+
         if(!m_nativeLeanCRT)
         {
             wchar_t modulePath[MAX_PATH] = {};
             GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
             const wchar_t* nativeFile = L"LeanCRT.hlsl";
-            switch(m_nativePreset)
+            switch(nativePreset)
             {
             case 1: nativeFile = L"LeanCRT-Retro43.hlsl"; break;
             case 2: nativeFile = L"LeanCRT-Modern.hlsl"; break;
@@ -654,13 +652,14 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
             }
             else
             {
-                m_nativeLeanCRT->SetOutputPass(m_nativePreset == 4);
-                m_nativeLeanCRT->SetEnabled(m_nativeEnabled);
+                m_nativeLeanCRT->SetOutputPass(nativePreset == 4);
+                m_nativeLeanCRT->SetEnabled(nativeEnabled);
             }
         }
 
         if(m_nativeLeanCRT && m_displayRenderTarget)
         {
+            m_nativeLeanCRT->SetEnabled(nativeEnabled);
             winrt::com_ptr<ID3D11ShaderResourceView> inputView;
             if(SUCCEEDED(m_device->CreateShaderResourceView(texture.get(), nullptr, inputView.put())))
             {

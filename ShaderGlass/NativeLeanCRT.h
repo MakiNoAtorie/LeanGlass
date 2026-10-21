@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <string>
@@ -15,7 +16,7 @@ class NativeLeanCRT
 public:
     bool Initialize(ID3D11Device* device, ID3D11DeviceContext* context, const std::wstring& hlslPath, std::wstring& error);
     void Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetView* output, UINT outputWidth, UINT outputHeight);
-    void SetEnabled(bool enabled) { m_enabled = enabled; }
+    void SetEnabled(bool enabled) { m_enabled.store(enabled, std::memory_order_relaxed); }
     void SetOutputPass(bool enabled) { m_outputPass = enabled; }
     void Shutdown();
     bool IsReady() const { return m_ready; }
@@ -76,6 +77,6 @@ private:
 
     UINT m_frame = 60;
     bool m_ready = false;
-    bool m_enabled = true;
+    std::atomic<bool> m_enabled {true};
     bool m_outputPass = false;
 };

@@ -7,6 +7,8 @@ GNU General Public License v3.0
 
 #pragma once
 
+#include <atomic>
+
 #include "Preset.h"
 #include "ShaderPass.h"
 #include "NativeLeanCRT.h"
@@ -128,8 +130,9 @@ private:
     std::unique_ptr<Preset>                           m_newShaderPreset {nullptr};
     std::unique_ptr<NativeLeanCRT>                    m_nativeLeanCRT {nullptr};
     bool                                              m_nativeMode {false};
-    bool                                              m_nativeEnabled {true};
-    int                                               m_nativePreset {0};
+    std::atomic<bool>                                 m_nativeEnabled {true};
+    std::atomic<int>                                  m_nativePreset {0};
+    std::atomic<bool>                                 m_nativeResetPending {false};
     std::mutex                                        m_nativeErrorMutex;
     std::wstring                                      m_nativeError;
     std::vector<std::tuple<int, std::string, double>> m_newParams;

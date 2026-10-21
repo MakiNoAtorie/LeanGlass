@@ -16,7 +16,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
       - name: Build
         shell: cmd
-        run: cl /nologo /std:c++17 /EHsc /O2 /I native\spike native\spike\main.cpp /Fe:native-spike.exe /link d3d11.lib d3dcompiler.lib
+        run: cl /nologo /std:c++17 /EHsc /O2 /I native\spike native\spike\main.cpp /Fe:native-spike.exe /link d3d11.lib d3dcompiler.lib dxguid.lib
       - name: Run
         shell: cmd
         run: |

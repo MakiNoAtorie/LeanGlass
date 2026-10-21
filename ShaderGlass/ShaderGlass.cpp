@@ -1177,8 +1177,36 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
             m_nativeLeanCRT->SetEnabled(nativeEnabled);
             if(m_originalView)
             {
+                int  nativeX = m_boxX;
+                int  nativeY = m_boxY;
+                UINT nativeW = viewportWidth;
+                UINT nativeH = viewportHeight;
+
+                // The 4:3 shaders draw the 4:3 picture stretched across the
+                // 1920x1080 intermediate; fitting that frame into a 4:3
+                // destination restores the content box. Other presets keep
+                // the normal letterbox/output-scale rectangle.
+                if(nativeEnabled && (nativePreset == 1 || nativePreset == 3))
+                {
+                    const float aspect = 4.0f / 3.0f;
+                    nativeX = 0;
+                    nativeY = 0;
+                    nativeW = static_cast<UINT>(clientRect.right);
+                    nativeH = static_cast<UINT>(clientRect.bottom);
+                    if(nativeW > nativeH * aspect)
+                    {
+                        nativeW = static_cast<UINT>(roundf(nativeH * aspect));
+                        nativeX = (clientRect.right - static_cast<LONG>(nativeW)) / 2;
+                    }
+                    else
+                    {
+                        nativeH = static_cast<UINT>(roundf(nativeW / aspect));
+                        nativeY = (clientRect.bottom - static_cast<LONG>(nativeH)) / 2;
+                    }
+                }
+
                 m_nativeLeanCRT->Render(m_originalView.get(), m_displayRenderTarget.get(),
-                    static_cast<UINT>(clientRect.right), static_cast<UINT>(clientRect.bottom));
+                    nativeX, nativeY, nativeW, nativeH);
                 FinishFrame();
                 return;
             }

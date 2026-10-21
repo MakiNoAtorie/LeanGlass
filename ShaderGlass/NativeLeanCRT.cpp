@@ -498,14 +498,14 @@ void NativeLeanCRT::RunMaskPrewarm()
     }
 }
 
-void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetView* output, UINT outputWidth, UINT outputHeight)
+void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetView* output, int outputX, int outputY, UINT outputWidth, UINT outputHeight)
 {
-    if (!m_ready || !input || !output)
+    if (!m_ready || !input || !output || outputWidth == 0 || outputHeight == 0)
         return;
 
     if (!m_enabled.load(std::memory_order_relaxed))
     {
-        RenderBypass(input, output, outputWidth, outputHeight);
+        RenderBypass(input, output, outputX, outputY, outputWidth, outputHeight);
         return;
     }
 
@@ -575,7 +575,12 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
     ID3D11RenderTargetView* backbuffer = output;
     m_context->OMSetRenderTargets(1, &backbuffer, nullptr);
 
+    const float clear[4] = { 0, 0, 0, 1 };
+    m_context->ClearRenderTargetView(output, clear);
+
     D3D11_VIEWPORT viewport = {};
+    viewport.TopLeftX = static_cast<float>(outputX);
+    viewport.TopLeftY = static_cast<float>(outputY);
     viewport.Width    = static_cast<float>(outputWidth);
     viewport.Height   = static_cast<float>(outputHeight);
     viewport.MaxDepth = 1.0f;
@@ -632,12 +637,17 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
     m_textures[T_INPUT].srv = nullptr;
 }
 
-void NativeLeanCRT::RenderBypass(ID3D11ShaderResourceView* input, ID3D11RenderTargetView* output, UINT outputWidth, UINT outputHeight)
+void NativeLeanCRT::RenderBypass(ID3D11ShaderResourceView* input, ID3D11RenderTargetView* output, int outputX, int outputY, UINT outputWidth, UINT outputHeight)
 {
     ID3D11RenderTargetView* backbuffer = output;
     m_context->OMSetRenderTargets(1, &backbuffer, nullptr);
 
+    const float clear[4] = { 0, 0, 0, 1 };
+    m_context->ClearRenderTargetView(output, clear);
+
     D3D11_VIEWPORT viewport = {};
+    viewport.TopLeftX = static_cast<float>(outputX);
+    viewport.TopLeftY = static_cast<float>(outputY);
     viewport.Width    = static_cast<float>(outputWidth);
     viewport.Height   = static_cast<float>(outputHeight);
     viewport.MaxDepth = 1.0f;

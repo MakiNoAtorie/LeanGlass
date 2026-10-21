@@ -1067,6 +1067,7 @@ void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
             m_captureManager.SetNativePreset(static_cast<int>(preset));
         }
         m_captureManager.SetNativeEnabled(m_leanCRTEnabled);
+        LeanCRT::SavePreset(preset);
         UpdateLeanCRTMenu();
         UpdateTitle();
         if(was43 || Is43Preset(preset))
@@ -1157,7 +1158,8 @@ void ShaderWindow::ShowLeanCRTSetupInfo()
             L"Required: the native\\LeanCRT*.hlsl files next to LeanGlass.exe.\n"
             L"This build has no dxgi.dll and no ReShade.ini.\n\n"
             L"Native renders at 1920x1080 internally and compiles one HLSL per preset. "
-            L"Retro 4:3 and Modern 4:3 keep a 4:3 window; Arcade runs the Output/geometry pass.";
+            L"Retro 4:3 and Modern 4:3 keep a 4:3 window and read the center 1440x1080 content box of a 16:9 source. "
+            L"Arcade runs the Output/geometry pass.";
         if(!m_leanCRTError.empty())
             message += L"\n\nLast error:\n" + m_leanCRTError;
         MessageBoxW(m_mainWindow, message.c_str(), L"LeanCRT (native)", MB_OK | MB_ICONINFORMATION);
@@ -2617,7 +2619,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
         // prevent flicker
         return 0;
     case WM_SIZING: {
-        if(!m_isBorderless)
+        if(m_nativeMode && !m_isBorderless)
             ApplyProportionalSizing(reinterpret_cast<RECT*>(lParam), wParam);
         return TRUE;
     }

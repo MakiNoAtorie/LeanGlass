@@ -44,6 +44,22 @@ pending on Windows; CI only checks that the build succeeds.
   `useHDR` off at startup (menu unchecked, ReShade registry state untouched);
   the ReShade path keeps its current HDR behavior.
 
+## Fixed in the v0.4.1 review
+
+- [x] **P2 — ReShade window resizing became content-locked.** `WM_SIZING`
+  proportional sizing now only runs in native mode, so the ReShade path keeps
+  its old free resize behavior.
+- [x] **P2 — native preset was not persisted.** Native preset/Off changes now
+  call `LeanCRT::SavePreset` like the ReShade path, so `LoadSavedPreset` sees
+  the last native choice.
+- [x] **P2 — native final blit ignored the content rectangle.** The blit now
+  uses the same letterbox/output-scale rectangle as the ShaderGlass path and
+  clears the bars. 4:3 presets are fitted to a 4:3 destination, preserving the
+  content box in borderless/oversized windows.
+
+Still runtime-only: visual parity of the 4:3 content box and Arcade geometry at
+non-1080p, and the HDR/SDR output path on an HDR display.
+
 ## Fixed in v0.2.2
 
 - [x] Native FPS is counted again; the title shows `LeanGlass native (Retro, ~Nfps)`.

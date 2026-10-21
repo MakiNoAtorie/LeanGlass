@@ -1513,9 +1513,9 @@ double ShaderWindow::ContentAspect()
 
 void ShaderWindow::ApplyProportionalSizing(RECT* rect, WPARAM edge)
 {
-    // Free and Stretch let the user choose the window shape; native letterboxes
-    // or stretches to it in the final blit.
-    if(m_captureOptions.freeScale || m_captureOptions.aspectRatio <= 0)
+    // Native mode keeps the window proportional even when Free/Stretch scaling
+    // is active; the final blit still letterboxes or stretches to fit.
+    if(m_captureOptions.aspectRatio <= 0)
         return;
 
     const double aspect = ContentAspect();
@@ -1617,7 +1617,7 @@ void ShaderWindow::ApplyProportionalSizing(RECT* rect, WPARAM edge)
 
 void ShaderWindow::ResizeToContentAspect(HWND hWnd)
 {
-    if(!hWnd || m_isBorderless || IsZoomed(hWnd) || m_captureOptions.freeScale)
+    if(!hWnd || m_isBorderless || IsZoomed(hWnd))
         return;
     if(!(GetWindowLong(hWnd, GWL_STYLE) & WS_THICKFRAME))
         return;

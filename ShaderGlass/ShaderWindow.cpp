@@ -1001,6 +1001,104 @@ void ShaderWindow::BuildShaderMenu()
     LoadRecentImports();
 }
 
+void ShaderWindow::BuildLeanCRTMenu()
+{
+    m_leanCRTMenu = CreatePopupMenu();
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_ENABLE, L"Enabled");
+    AppendMenuW(m_leanCRTMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_RETRO, L"Retro");
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_RETRO43, L"Retro 4:3");
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_MODERN, L"Modern");
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_MODERN43, L"Modern 4:3");
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_ARCADE, L"Arcade");
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_OFF, L"Off");
+    AppendMenuW(m_leanCRTMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_CAPTURE_FOREGROUND, L"Capture foreground window");
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_RELOAD, L"Reload shader");
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_SETUP, L"Setup / troubleshooting...");
+    InsertMenuW(m_mainMenu, 4, MF_BYPOSITION | MF_POPUP, (UINT_PTR)m_leanCRTMenu, L"LeanCRT");
+    UpdateLeanCRTMenu();
+}
+
+void ShaderWindow::UpdateLeanCRTMenu()
+{
+    if(!m_leanCRTMenu)
+        return;
+
+    CheckMenuItem(m_leanCRTMenu, IDM_LEANCRT_ENABLE, (m_leanCRTEnabled ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+    const int selected = IDM_LEANCRT_RETRO + static_cast<int>(m_leanCRTPreset);
+    CheckMenuRadioItem(m_leanCRTMenu, IDM_LEANCRT_RETRO, IDM_LEANCRT_OFF, selected, MF_BYCOMMAND);
+}
+
+void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
+{
+    std::wstring error;
+    if(!LeanCRT::ApplyPreset(preset, error))
+    {
+        if(m_leanCRTError.empty())
+            m_leanCRTError = error;
+        MessageBoxW(m_mainWindow, error.c_str(), L"LeanCRT", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    m_leanCRTPreset     = preset;
+    m_leanCRTEnabled    = preset != LeanCRT::Preset::Off;
+    if(m_leanCRTEnabled)
+        m_lastLeanCRTPreset = preset;
+    m_leanCRTError.clear();
+    UpdateLeanCRTMenu();
+}
+
+void ShaderWindow::CaptureForegroundWindow()
+{
+    HWND foreground = GetForegroundWindow();
+    if(!foreground || foreground == m_mainWindow)
+    {
+        MessageBoxW(m_mainWindow, L"Focus the game window first, then pick this again.", L"LeanCRT", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+
+    wchar_t title[512] = {};
+    if(GetWindowTextW(foreground, title, 512) == 0)
+    {
+        MessageBoxW(m_mainWindow, L"The foreground window has no title. Use Input > Window instead.", L"LeanCRT", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+
+    if(m_captureManager.IsActive())
+        Stop();
+
+    m_captureOptions.clone       = false;
+    m_captureOptions.transparent = true;
+    SetCaptureWindow(title);
+    m_captureOptions.clone       = false;
+    m_captureOptions.transparent = true;
+    SetTransparent(true);
+    CheckMenuItem(m_modeMenu, IDM_MODE_GLASS, MF_CHECKED | MF_BYCOMMAND);
+    CheckMenuItem(m_modeMenu, IDM_MODE_CLONE, MF_UNCHECKED | MF_BYCOMMAND);
+    CheckMenuItem(m_outputWindowMenu, IDM_WINDOW_TRANSPARENT, MF_CHECKED | MF_BYCOMMAND);
+    CheckMenuItem(m_outputWindowMenu, IDM_WINDOW_SOLID, MF_UNCHECKED | MF_BYCOMMAND);
+    UpdateWindowState();
+    Start();
+
+    if(!m_isBorderless)
+        ToggleBorderless(m_mainWindow);
+}
+
+void ShaderWindow::ShowLeanCRTSetupInfo()
+{
+    std::wstring message =
+        L"LeanCRT needs two things next to LeanGlass.exe:\n\n"
+        L"1. dxgi.dll - the ReShade engine (included in the release build).\n"
+        L"2. leancrt\\Shaders\\LeanCRT.fx and leancrt\\presets.\n\n"
+        L"For a development build, run tools\\setup-reshade.ps1 once.\n";
+
+    if(!m_leanCRTError.empty())
+        message += L"\nLast error:\n" + m_leanCRTError;
+
+    MessageBoxW(m_mainWindow, message.c_str(), L"LeanCRT setup", MB_OK | MB_ICONINFORMATION);
+}
+
 LRESULT CALLBACK ShaderWindow::WndProcProxy(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     ShaderWindow* app;
@@ -1412,6 +1510,37 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
         case IDM_START:
             if(!Start())
                 return 0;
+            break;
+        case IDM_LEANCRT_ENABLE:
+            ApplyLeanCRTPreset(m_leanCRTEnabled ? LeanCRT::Preset::Off : m_lastLeanCRTPreset);
+            break;
+        case IDM_LEANCRT_RETRO:
+            ApplyLeanCRTPreset(LeanCRT::Preset::Retro);
+            break;
+        case IDM_LEANCRT_RETRO43:
+            ApplyLeanCRTPreset(LeanCRT::Preset::Retro43);
+            break;
+        case IDM_LEANCRT_MODERN:
+            ApplyLeanCRTPreset(LeanCRT::Preset::Modern);
+            break;
+        case IDM_LEANCRT_MODERN43:
+            ApplyLeanCRTPreset(LeanCRT::Preset::Modern43);
+            break;
+        case IDM_LEANCRT_ARCADE:
+            ApplyLeanCRTPreset(LeanCRT::Preset::Arcade);
+            break;
+        case IDM_LEANCRT_OFF:
+            ApplyLeanCRTPreset(LeanCRT::Preset::Off);
+            break;
+        case IDM_LEANCRT_CAPTURE_FOREGROUND:
+            CaptureForegroundWindow();
+            break;
+        case IDM_LEANCRT_RELOAD:
+            if(!LeanCRT::Reload())
+                MessageBoxW(m_mainWindow, L"Could not send the shader reload shortcut.", L"LeanCRT", MB_OK | MB_ICONWARNING);
+            break;
+        case IDM_LEANCRT_SETUP:
+            ShowLeanCRTSetupInfo();
             break;
         case ID_PROCESSING_FULLSCREEN:
             ToggleBorderless(hWnd);
@@ -2474,10 +2603,20 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     m_programMenu = GetSubMenu(m_mainMenu, 0);
     m_shaderMenu  = GetSubMenu(m_mainMenu, 3);
     m_helpMenu    = GetSubMenu(m_mainMenu, 4);
+
+    std::wstring leanError;
+    if (!LeanCRT::EnsureInstalled(leanError))
+        m_leanCRTError = leanError;
+
+    m_leanCRTPreset = LeanCRT::LoadSavedPreset();
+    m_leanCRTEnabled = m_leanCRTPreset != LeanCRT::Preset::Off;
+    m_lastLeanCRTPreset = m_leanCRTEnabled ? m_leanCRTPreset : LeanCRT::Preset::Retro;
+
     BuildProgramMenu();
     BuildInputMenu();
     BuildOutputMenu();
     BuildShaderMenu();
+    BuildLeanCRTMenu();
     ScanDisplays();
 
     if(!HasCaptureAPI())

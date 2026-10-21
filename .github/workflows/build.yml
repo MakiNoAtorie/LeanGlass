@@ -26,9 +26,25 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} ShaderGlass.sln
 
+    - name: Stage LeanGlass
+      shell: pwsh
+      run: |
+        $stage = "stage"
+        New-Item -ItemType Directory -Force -Path $stage | Out-Null
+        Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\LeanGlass.exe" "$stage\LeanGlass.exe" -ErrorAction Stop
+        Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\leancrt" "$stage\leancrt" -Recurse -Force
+        Copy-Item ".\ShaderGlass\leancrt\ReShade.ini" "$stage\ReShade.ini" -Force
+        Copy-Item ".\LICENSE" "$stage\ShaderGlass-LICENSE.txt" -Force
+        if (Test-Path ".\README-LEANGLASS.txt") { Copy-Item ".\README-LEANGLASS.txt" "$stage\README-LEANGLASS.txt" -Force }
+
+        Invoke-WebRequest -Uri "https://reshade.me/downloads/ReShade_Setup_6.6.2.exe" -OutFile "reshade-setup.exe"
+        & ".\tools\extract-reshade.ps1" -Setup ".\reshade-setup.exe" -OutFile "$stage\dxgi.dll"
+
+        Compress-Archive -Path "$stage\*" -DestinationPath "LeanGlass-x64.zip" -Force
+
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: 'ShaderGlass_${{ matrix.platform }}_${{ matrix.configuration }}'
-        path: '.\${{ matrix.platform }}\${{ matrix.configuration }}\ShaderGlass.exe'
+        name: 'LeanGlass_${{ matrix.platform }}_${{ matrix.configuration }}'
+        path: 'LeanGlass-x64.zip'
         overwrite: true

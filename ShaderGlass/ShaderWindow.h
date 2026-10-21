@@ -17,6 +17,7 @@ GNU General Public License v3.0
 #include "CropDialog.h"
 #include "HotkeyDialog.h"
 #include "Helpers.h"
+#include "LeanCRT.h"
 
 class ShaderWindow
 {
@@ -57,6 +58,7 @@ private:
     HMENU                         m_importsMenu {nullptr};
     HMENU                         m_advancedMenu {nullptr};
     HMENU                         m_helpMenu {nullptr};
+    HMENU                         m_leanCRTMenu {nullptr};
     HMENU                         m_orientationMenu {nullptr};
     std::vector<CaptureWindow>    m_captureWindows;
     std::vector<CaptureDisplay>   m_captureDisplays;
@@ -89,6 +91,10 @@ private:
     std::filesystem::path         m_importPath;
     volatile bool                 m_forceStart {false};
     bool                          m_firstPaint {true};
+    LeanCRT::Preset               m_leanCRTPreset {LeanCRT::Preset::Retro};
+    LeanCRT::Preset               m_lastLeanCRTPreset {LeanCRT::Preset::Retro};
+    bool                          m_leanCRTEnabled {true};
+    std::wstring                  m_leanCRTError;
 
     bool         LoadProfile(const std::wstring& fileName, bool forceStart = false, const std::wstring& overrideInput = std::wstring());
     void         LoadProfile();
@@ -104,6 +110,11 @@ private:
     void         BuildInputMenu();
     void         BuildOutputMenu();
     void         BuildShaderMenu();
+    void         BuildLeanCRTMenu();
+    void         ApplyLeanCRTPreset(LeanCRT::Preset preset);
+    void         UpdateLeanCRTMenu();
+    void         CaptureForegroundWindow();
+    void         ShowLeanCRTSetupInfo();
     void         SetTransparent(bool transparent);
     void         AdjustWindowSize(HWND hWnd);
     void         UpdateWindowState();

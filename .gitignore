@@ -363,3 +363,8 @@ FodyWeavers.xsd
 
 Scripts/slang-shaders
 Scripts/temp
+
+# LeanGlass local artifacts
+dist/
+stage/
+LeanGlass-x64.zip

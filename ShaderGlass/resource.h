@@ -203,6 +203,18 @@
 #define IDC_STATIC                      -1
 #define IDC_STATIC_LABEL                -1
 
+// LeanGlass: LeanCRT integration
+#define IDM_LEANCRT_ENABLE              33000
+#define IDM_LEANCRT_RETRO               33001
+#define IDM_LEANCRT_RETRO43             33002
+#define IDM_LEANCRT_MODERN              33003
+#define IDM_LEANCRT_MODERN43            33004
+#define IDM_LEANCRT_ARCADE              33005
+#define IDM_LEANCRT_OFF                 33006
+#define IDM_LEANCRT_CAPTURE_FOREGROUND  33007
+#define IDM_LEANCRT_RELOAD              33008
+#define IDM_LEANCRT_SETUP               33009
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED

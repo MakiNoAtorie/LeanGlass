@@ -262,6 +262,64 @@ void UploadFrameCount(ID3D11DeviceContext* context, ID3D11Buffer* buffer, UINT f
     context->UpdateSubresource(buffer, 0, nullptr, &frame, 0, 0);
 }
 
+void PrintAverage(ID3D11Device* device, ID3D11DeviceContext* context, Texture& texture, const char* name)
+{
+    D3D11_TEXTURE2D_DESC desc = {};
+    texture.tex->GetDesc(&desc);
+
+    D3D11_TEXTURE2D_DESC staging_desc = desc;
+    staging_desc.Usage          = D3D11_USAGE_STAGING;
+    staging_desc.BindFlags      = 0;
+    staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    staging_desc.MiscFlags      = 0;
+
+    ComPtr<ID3D11Texture2D> staging;
+    if (FAILED(device->CreateTexture2D(&staging_desc, nullptr, &staging)))
+        return;
+    context->CopyResource(staging.Get(), texture.tex.Get());
+
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+        return;
+
+    double sum = 0;
+    size_t count = 0;
+    for (UINT y = 0; y < texture.h; ++y)
+    {
+        const uint8_t* row = static_cast<const uint8_t*>(mapped.pData) + static_cast<size_t>(y) * mapped.RowPitch;
+        for (UINT x = 0; x < texture.w; ++x)
+        {
+            if (desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM)
+            {
+                sum += (row[x * 4 + 0] + row[x * 4 + 1] + row[x * 4 + 2]) / (3.0 * 255.0);
+                ++count;
+            }
+            else if (desc.Format == DXGI_FORMAT_R16G16B16A16_UNORM)
+            {
+                const uint16_t* p = reinterpret_cast<const uint16_t*>(row) + x * 4;
+                sum += (p[0] + p[1] + p[2]) / (3.0 * 65535.0);
+                ++count;
+            }
+            else if (desc.Format == DXGI_FORMAT_R16G16_UNORM)
+            {
+                const uint16_t* p = reinterpret_cast<const uint16_t*>(row) + x * 2;
+                sum += (p[0] + p[1]) / (2.0 * 65535.0);
+                ++count;
+            }
+            else if (desc.Format == DXGI_FORMAT_R16_UNORM)
+            {
+                const uint16_t* p = reinterpret_cast<const uint16_t*>(row) + x;
+                sum += p[0] / 65535.0;
+                ++count;
+            }
+        }
+    }
+
+    context->Unmap(staging.Get(), 0);
+    if (count)
+        std::cout << "  avg " << name << ": " << (sum / count) << "\n";
+}
+
 void WriteBmp(const char* path, const uint8_t* rgba, UINT width, UINT height, UINT pitch)
 {
     const UINT row_size = (width * 3 + 3) & ~3u;
@@ -512,6 +570,8 @@ int main()
 
             ID3D11UnorderedAccessView* no_uavs[2] = {};
             context->CSSetUnorderedAccessViews(0, 2, no_uavs, nullptr);
+            PrintAverage(device.Get(), context.Get(), textures[T_BLOOM_HORIZ], "BloomHoriz");
+            PrintAverage(device.Get(), context.Get(), textures[T_FINAL], "Final");
             continue;
         }
 
@@ -540,6 +600,10 @@ int main()
         bind_graphics(vs_bindings[pass.vs], false);
         bind_graphics(ps_bindings[pass.ps], true);
         context->Draw(4, 0);
+
+        PrintAverage(device.Get(), context.Get(), textures[pass.rt0], pass.name);
+        if (pass.rt1 >= 0)
+            PrintAverage(device.Get(), context.Get(), textures[pass.rt1], "PhosphorBlue");
     }
 
     context->OMSetRenderTargets(0, nullptr, nullptr);

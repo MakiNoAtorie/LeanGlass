@@ -3304,6 +3304,11 @@ void ShaderWindow::Start(_In_ LPWSTR lpCmdLine, HWND paramsWindow, HWND browserW
     m_cropDialog.reset(new CropDialog(m_instance, m_mainWindow));
     m_hotkeyDialog.reset(new HotkeyDialog(m_instance, m_mainWindow));
 
+    // LeanGlass hosts LeanCRT. Never let a ShaderGlass shader stack on top of it:
+    // two CRT masks at different scales produce exactly the wavy moire pattern.
+    if(m_numPresets > 0)
+        SendMessage(m_mainWindow, WM_COMMAND, WM_SHADER(0), 0);
+
     if(autoStart && HasCaptureAPI() && !m_forceStart)
     {
         SendMessage(m_mainWindow, WM_COMMAND, IDM_START, 0);

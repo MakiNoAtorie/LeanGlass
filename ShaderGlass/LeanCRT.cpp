@@ -119,16 +119,15 @@ bool EnsureInstalled(std::wstring& error)
     std::filesystem::create_directories(data / L"Textures", ec);
     std::filesystem::create_directories(data / L"Cache", ec);
 
-    const std::wstring dataPath = data.wstring();
     std::wostringstream ini;
     ini << L"[GENERAL]\n"
-        << L"EffectSearchPaths=" << dataPath << L"\\Shaders\n"
-        << L"TextureSearchPaths=" << dataPath << L"\\Textures\n"
-        << L"PresetPath=" << dataPath << L"\\Active.ini\n"
+        << L"EffectSearchPaths=.\\leancrt\\Shaders\n"
+        << L"TextureSearchPaths=.\\leancrt\\Textures\n"
+        << L"PresetPath=.\\leancrt\\Active.ini\n"
         << L"PerformanceMode=1\n"
         << L"SkipLoadingDisabledEffects=1\n"
         << L"NoDebugInfo=1\n"
-        << L"IntermediateCachePath=" << dataPath << L"\\Cache\n"
+        << L"IntermediateCachePath=.\\leancrt\\Cache\n"
         << L"\n[INPUT]\n"
         << L"KeyMenu=36,1,0,1\n"
         << L"KeyEffects=0,0,0,0\n"

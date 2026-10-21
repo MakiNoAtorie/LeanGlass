@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-Add-Type -AssemblyName System.IO.Compression.FileSystem
+try { Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop } catch { }
 
 $setupPath = (Resolve-Path $Setup).Path
 $bytes = [System.IO.File]::ReadAllBytes($setupPath)

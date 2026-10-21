@@ -39,7 +39,7 @@ public:
     void  SetShaderPreset(PresetDef* p, const std::vector<std::tuple<int, std::string, double>>& params);
     void  SetNativeMode(bool nativeMode)
     {
-        m_nativeMode = nativeMode;
+        m_nativeMode.store(nativeMode, std::memory_order_relaxed);
     }
     void  SetNativeEnabled(bool enabled);
     void  SetNativePreset(int preset);
@@ -129,7 +129,7 @@ private:
     std::unique_ptr<Preset>                           m_shaderPreset {nullptr};
     std::unique_ptr<Preset>                           m_newShaderPreset {nullptr};
     std::unique_ptr<NativeLeanCRT>                    m_nativeLeanCRT {nullptr};
-    bool                                              m_nativeMode {false};
+    std::atomic<bool>                                 m_nativeMode {false};
     std::atomic<bool>                                 m_nativeEnabled {true};
     std::atomic<int>                                  m_nativePreset {0};
     std::atomic<bool>                                 m_nativeResetPending {false};

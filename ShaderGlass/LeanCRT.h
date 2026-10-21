@@ -31,11 +31,8 @@ namespace LeanCRT
     // runtime folders, and writes ReShade.ini with this installation's paths.
     bool EnsureInstalled(std::wstring& error);
 
-    // Copies the preset over leancrt\Active.ini and asks ReShade to reload it.
+    // Copies the preset over leancrt\Active.ini. The caller asks ReShade to reload.
     bool ApplyPreset(Preset preset, std::wstring& error);
-
-    // Sends ReShade's reload shortcut (Ctrl+Alt+R).
-    bool Reload();
 
     Preset LoadSavedPreset();
     void   SavePreset(Preset preset);

@@ -11,6 +11,7 @@ GNU General Public License v3.0
 #define MENU_FADE_DELAY 1000
 #define CUSTOM_PARAM_SCALE 1000
 #define TIMER_LEANCRT 1
+#define TIMER_LEANCRT_RELOAD 2
 
 #include "Options.h"
 #include "CaptureManager.h"
@@ -115,6 +116,7 @@ private:
     void         BuildLeanCRTMenu();
     void         ApplyLeanCRTPreset(LeanCRT::Preset preset);
     void         UpdateLeanCRTMenu();
+    void         ReloadLeanCRT();
     void         CaptureForegroundWindow();
     void         ShowLeanCRTSetupInfo();
     void         SetTransparent(bool transparent);

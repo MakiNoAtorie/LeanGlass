@@ -1047,6 +1047,19 @@ void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
         m_lastLeanCRTPreset = preset;
     m_leanCRTError.clear();
     UpdateLeanCRTMenu();
+    ReloadLeanCRT();
+}
+
+void ShaderWindow::ReloadLeanCRT()
+{
+    // In glass mode the game keeps keyboard focus, so SendInput never reaches
+    // ReShade inside this window. Post the hotkey directly to our own window:
+    // ReShade's input hook sees it regardless of focus. The key-ups are delayed
+    // so at least one frame observes the press.
+    PostMessageW(m_mainWindow, WM_KEYDOWN, VK_CONTROL, 0);
+    PostMessageW(m_mainWindow, WM_KEYDOWN, VK_MENU, 0);
+    PostMessageW(m_mainWindow, WM_KEYDOWN, 'R', 0);
+    SetTimer(m_mainWindow, TIMER_LEANCRT_RELOAD, 150, NULL);
 }
 
 void ShaderWindow::CaptureForegroundWindow()
@@ -1538,8 +1551,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             CaptureForegroundWindow();
             break;
         case IDM_LEANCRT_RELOAD:
-            if(!LeanCRT::Reload())
-                MessageBoxW(m_mainWindow, L"Could not send the shader reload shortcut.", L"LeanCRT", MB_OK | MB_ICONWARNING);
+            ReloadLeanCRT();
             break;
         case IDM_LEANCRT_SETUP:
             ShowLeanCRTSetupInfo();
@@ -2454,6 +2466,12 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 m_lastExternalForeground = foreground;
             return 0;
         }
+        case TIMER_LEANCRT_RELOAD:
+            KillTimer(m_mainWindow, TIMER_LEANCRT_RELOAD);
+            PostMessageW(m_mainWindow, WM_KEYUP, 'R', 0);
+            PostMessageW(m_mainWindow, WM_KEYUP, VK_MENU, 0);
+            PostMessageW(m_mainWindow, WM_KEYUP, VK_CONTROL, 0);
+            return 0;
         }
         break;
     case WM_DESTROY:

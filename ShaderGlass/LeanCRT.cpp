@@ -175,27 +175,7 @@ bool ApplyPreset(Preset preset, std::wstring& error)
     }
 
     SavePreset(preset);
-    Reload();
     return true;
-}
-
-bool Reload()
-{
-    INPUT input[6] = {};
-    for (INPUT& item : input)
-        item.type = INPUT_KEYBOARD;
-
-    input[0].ki.wVk = VK_CONTROL;
-    input[1].ki.wVk = VK_MENU;
-    input[2].ki.wVk = 'R';
-    input[3].ki.wVk = 'R';
-    input[3].ki.dwFlags = KEYEVENTF_KEYUP;
-    input[4].ki.wVk = VK_MENU;
-    input[4].ki.dwFlags = KEYEVENTF_KEYUP;
-    input[5].ki.wVk = VK_CONTROL;
-    input[5].ki.dwFlags = KEYEVENTF_KEYUP;
-
-    return SendInput(6, input, static_cast<int>(sizeof(INPUT))) == 6;
 }
 
 Preset LoadSavedPreset()

@@ -7,6 +7,7 @@ GNU General Public License v3.0
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 
 namespace LeanCRT
@@ -23,9 +24,14 @@ namespace LeanCRT
 
     const wchar_t* PresetName(Preset preset);
     const wchar_t* PresetFile(Preset preset);
+    std::optional<Preset> ParsePreset(const std::wstring& name);
 
     std::filesystem::path AppDir();
     std::filesystem::path DataDir();
+
+    // Native mode is explicit: native\backend.flag exists and no dxgi.dll.
+    // A dxgi.dll always wins so ReShade is never stacked under the native path.
+    bool IsNativeMode();
 
     // Checks for the ReShade proxy and the LeanCRT shader tree, creates the
     // runtime folders, and writes ReShade.ini with this installation's paths.
@@ -36,4 +42,7 @@ namespace LeanCRT
 
     Preset LoadSavedPreset();
     void   SavePreset(Preset preset);
+
+    bool LoadAutoForeground();
+    void SaveAutoForeground(bool enabled);
 }

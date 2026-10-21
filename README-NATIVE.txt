@@ -6,6 +6,7 @@ This build does not use ReShade. LeanGlass runs LeanCRT itself with Direct3D 11.
 Contents
 --------
 LeanGlass.exe          the application
+native\backend.flag    marks this folder as a native build
 native\LeanCRT*.hlsl   generated from the unmodified LeanCRT shader
 ShaderGlass-LICENSE.txt
 LeanCRT-LICENSE.txt
@@ -18,6 +19,9 @@ Usage
 4. Start.
 
 There is no dxgi.dll, no ReShade.ini, and no .ini preset files.
+Keep native\backend.flag in place: LeanGlass selects the native backend from
+that file. If a dxgi.dll is also present, ReShade wins and native mode is not
+used.
 
 Current limits
 --------------

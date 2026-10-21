@@ -53,6 +53,7 @@ bool ShaderWindow::LoadProfile(const std::wstring& fileName, bool forceStart, co
         std::optional<std::string>                        desktopName;
         std::optional<bool>                               transparent;
         std::optional<bool>                               clone;
+        std::optional<LeanCRT::Preset>                    leanCRTPreset;
         std::vector<std::tuple<int, std::string, double>> params;
         bool                                              isImport = false;
         if(overrideInput.size())
@@ -207,6 +208,12 @@ bool ShaderWindow::LoadProfile(const std::wstring& fileName, bool forceStart, co
             {
                 transparent = (value == "1");
             }
+            else if(key == "LeanCRTPreset")
+            {
+                wchar_t wideName[64] = {};
+                if(MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, wideName, 64) > 0)
+                    leanCRTPreset = LeanCRT::ParsePreset(wideName);
+            }
             else if(key == "ScaleLocked")
             {
                 if(value == "1")
@@ -335,6 +342,12 @@ bool ShaderWindow::LoadProfile(const std::wstring& fileName, bool forceStart, co
                 CheckMenuItem(m_outputWindowMenu, IDM_WINDOW_TRANSPARENT, MF_UNCHECKED | MF_BYCOMMAND);
                 CheckMenuItem(m_outputWindowMenu, IDM_WINDOW_SOLID, MF_CHECKED | MF_BYCOMMAND);
             }
+        }
+
+        // profiles from before the LeanCRT key keep the current preset
+        if(leanCRTPreset.has_value())
+        {
+            ApplyLeanCRTPreset(leanCRTPreset.value());
         }
 
         // load any parameters
@@ -563,6 +576,11 @@ void ShaderWindow::SaveProfile(const std::wstring& fileName)
     outfile << "CaptureCursor " << std::quoted(std::to_string(m_captureOptions.captureCursor)) << std::endl;
     outfile << "Transparent " << std::quoted(std::to_string(m_captureOptions.transparent)) << std::endl;
     outfile << "ScaleLocked " << std::quoted(std::to_string(ScaleLocked())) << std::endl;
+    {
+        char utfName[64] = {};
+        WideCharToMultiByte(CP_UTF8, 0, LeanCRT::PresetName(m_leanCRTPreset), -1, utfName, 64, NULL, NULL);
+        outfile << "LeanCRTPreset " << std::quoted(utfName) << std::endl;
+    }
     outfile << "InputArea \"" << std::to_string(m_captureOptions.inputArea.left) << " " << std::to_string(m_captureOptions.inputArea.top) << " "
             << std::to_string(m_captureOptions.inputArea.right) << " " << std::to_string(m_captureOptions.inputArea.bottom) << "\"" << std::endl;
     if(m_captureOptions.deviceFormatNo)
@@ -1008,6 +1026,13 @@ void ShaderWindow::BuildShaderMenu()
     m_importsMenu = CreatePopupMenu();
     InsertMenu(m_shaderMenu, 7, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)m_importsMenu, L"Recent imports");
     LoadRecentImports();
+
+    // Native mode draws only the LeanCRT preset; ShaderGlass shaders and their
+    // parameters do nothing there, so make that clear instead of offering them.
+    if(m_nativeMode)
+    {
+        ModifyMenuW(m_mainMenu, 3, MF_BYPOSITION | MF_POPUP | MF_DISABLED | MF_GRAYED, (UINT_PTR)m_shaderMenu, L"Shader (unavailable in native mode)");
+    }
 }
 
 void ShaderWindow::BuildLeanCRTMenu()
@@ -1023,6 +1048,7 @@ void ShaderWindow::BuildLeanCRTMenu()
     AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_OFF, L"Off");
     AppendMenuW(m_leanCRTMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_CAPTURE_FOREGROUND, L"Capture foreground window");
+    AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_AUTO_FOREGROUND, L"Auto foreground");
     AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_RELOAD, L"Reload shader");
     AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_SETUP, L"Setup / troubleshooting...");
     InsertMenuW(m_mainMenu, 4, MF_BYPOSITION | MF_POPUP, (UINT_PTR)m_leanCRTMenu, L"LeanCRT");
@@ -1036,6 +1062,7 @@ void ShaderWindow::UpdateLeanCRTMenu()
         return;
 
     CheckMenuItem(m_leanCRTMenu, IDM_LEANCRT_ENABLE, (m_leanCRTEnabled ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+    CheckMenuItem(m_leanCRTMenu, IDM_LEANCRT_AUTO_FOREGROUND, (m_autoForeground ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
     const int selected = IDM_LEANCRT_RETRO + static_cast<int>(m_leanCRTPreset);
     CheckMenuRadioItem(m_leanCRTMenu, IDM_LEANCRT_RETRO, IDM_LEANCRT_OFF, selected, MF_BYCOMMAND);
 }
@@ -1111,22 +1138,36 @@ void ShaderWindow::ReloadLeanCRT()
     SetTimer(m_mainWindow, TIMER_LEANCRT_RELOAD, 150, NULL);
 }
 
-void ShaderWindow::CaptureForegroundWindow()
+void ShaderWindow::CaptureForegroundWindow(HWND window, bool quiet)
 {
-    HWND foreground = GetForegroundWindow();
-    if(foreground == m_mainWindow)
+    HWND foreground = window ? window : GetForegroundWindow();
+    if(!window && foreground == m_mainWindow)
         foreground = m_lastExternalForeground;
     if(!foreground || foreground == m_mainWindow)
     {
-        MessageBoxW(m_mainWindow, L"Focus the game window first, then pick this again.", L"LeanCRT", MB_OK | MB_ICONINFORMATION);
+        if(!quiet)
+            MessageBoxW(m_mainWindow, L"Focus the game window first, then pick this again.", L"LeanCRT", MB_OK | MB_ICONINFORMATION);
         return;
     }
 
-    wchar_t title[512] = {};
-    if(GetWindowTextW(foreground, title, 512) == 0)
+    const auto title = GetWindowStringText(foreground);
+    if(title.empty())
     {
-        MessageBoxW(m_mainWindow, L"The foreground window has no title. Use Input > Window instead.", L"LeanCRT", MB_OK | MB_ICONINFORMATION);
+        if(!quiet)
+            MessageBoxW(m_mainWindow, L"The foreground window has no title. Use Input > Window instead.", L"LeanCRT", MB_OK | MB_ICONINFORMATION);
         return;
+    }
+
+    if(quiet)
+    {
+        // Auto attach runs unattended: only take a normal, visible window from
+        // another process and never restart on the window already captured.
+        DWORD pid = 0;
+        GetWindowThreadProcessId(foreground, &pid);
+        if(pid == GetCurrentProcessId() || foreground == m_captureOptions.captureWindow ||
+            !IsWindowVisible(foreground) || IsIconic(foreground) || IsHungAppWindow(foreground) ||
+            (GetWindowLong(foreground, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) || !IsAltTabWindow(foreground) || !HasCaptureAPI())
+            return;
     }
 
     if(m_captureManager.IsActive())
@@ -1135,6 +1176,8 @@ void ShaderWindow::CaptureForegroundWindow()
     m_captureOptions.clone       = false;
     m_captureOptions.transparent = true;
     SetCaptureWindow(title);
+    if(quiet && m_captureOptions.captureWindow != foreground)
+        return;
     m_captureOptions.clone       = false;
     m_captureOptions.transparent = true;
     SetTransparent(true);
@@ -1810,6 +1853,12 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             break;
         case IDM_LEANCRT_CAPTURE_FOREGROUND:
             CaptureForegroundWindow();
+            break;
+        case IDM_LEANCRT_AUTO_FOREGROUND:
+            m_autoForeground = !m_autoForeground;
+            m_autoCaptureTried = nullptr;
+            LeanCRT::SaveAutoForeground(m_autoForeground);
+            UpdateLeanCRTMenu();
             break;
         case IDM_LEANCRT_RELOAD:
             ReloadLeanCRT();
@@ -2733,6 +2782,15 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             HWND foreground = GetForegroundWindow();
             if(foreground && foreground != m_mainWindow)
                 m_lastExternalForeground = foreground;
+
+            if(m_autoForeground && !m_inMenu && !m_inDialog && m_captureManager.IsActive() && foreground &&
+                foreground != m_mainWindow && foreground != m_captureOptions.captureWindow && foreground != m_autoCaptureTried)
+            {
+                // One attempt per newly focused window; failures are not retried
+                // on every tick.
+                m_autoCaptureTried = foreground;
+                CaptureForegroundWindow(foreground, true);
+            }
             return 0;
         }
         case TIMER_LEANCRT_RELOAD:
@@ -2902,8 +2960,9 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     m_helpMenu    = GetSubMenu(m_mainMenu, 4);
 
     std::wstring leanError;
-    // No ReShade DLL means the native backend is the intended path.
-    m_nativeMode = !std::filesystem::exists(LeanCRT::AppDir() / L"dxgi.dll");
+    // The native package ships native\backend.flag. A dxgi.dll still wins so
+    // ReShade is never silently bypassed.
+    m_nativeMode = LeanCRT::IsNativeMode();
     if (!LeanCRT::EnsureInstalled(leanError))
         m_leanCRTError = leanError;
     m_captureManager.SetNativeMode(m_nativeMode);
@@ -2911,6 +2970,7 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     m_leanCRTPreset = LeanCRT::LoadSavedPreset();
     m_leanCRTEnabled = m_leanCRTPreset != LeanCRT::Preset::Off;
     m_lastLeanCRTPreset = m_leanCRTEnabled ? m_leanCRTPreset : LeanCRT::Preset::Retro;
+    m_autoForeground = LeanCRT::LoadAutoForeground();
     if(m_nativeMode)
     {
         m_captureManager.SetNativeEnabled(m_leanCRTEnabled);

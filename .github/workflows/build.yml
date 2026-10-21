@@ -48,6 +48,7 @@ jobs:
         New-Item -ItemType Directory -Force -Path $nativeStage | Out-Null
         Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\LeanGlass.exe" "$nativeStage\LeanGlass.exe" -Force
         New-Item -ItemType Directory -Force -Path "$nativeStage\native" | Out-Null
+        Copy-Item ".\native\backend.flag" "$nativeStage\native\backend.flag" -Force
         Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\native\LeanCRT.hlsl" "$nativeStage\native\LeanCRT.hlsl" -Force
         Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\native\LeanCRT-Retro43.hlsl" "$nativeStage\native\LeanCRT-Retro43.hlsl" -Force
         Copy-Item ".\${{ matrix.platform }}\${{ matrix.configuration }}\native\LeanCRT-Modern.hlsl" "$nativeStage\native\LeanCRT-Modern.hlsl" -Force
@@ -60,6 +61,7 @@ jobs:
 
         $expectedNative = @(
           'LeanGlass.exe',
+          'native\backend.flag',
           'native\LeanCRT.hlsl',
           'native\LeanCRT-Retro43.hlsl',
           'native\LeanCRT-Modern.hlsl',

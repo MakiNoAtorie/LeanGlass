@@ -99,6 +99,8 @@ private:
     bool                          m_leanCRTEnabled {true};
     std::wstring                  m_leanCRTError;
     HWND                          m_lastExternalForeground {nullptr};
+    bool                          m_autoForeground {false};
+    HWND                          m_autoCaptureTried {nullptr};
 
     bool         LoadProfile(const std::wstring& fileName, bool forceStart = false, const std::wstring& overrideInput = std::wstring());
     void         LoadProfile();
@@ -119,7 +121,7 @@ private:
     void         UpdateLeanCRTMenu();
     void         ReloadLeanCRT();
     void         CheckNativeError();
-    void         CaptureForegroundWindow();
+    void         CaptureForegroundWindow(HWND window = nullptr, bool quiet = false);
     void         ShowLeanCRTSetupInfo();
     void         SetTransparent(bool transparent);
     void         AdjustWindowSize(HWND hWnd);

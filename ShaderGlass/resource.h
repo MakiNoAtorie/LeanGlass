@@ -214,6 +214,7 @@
 #define IDM_LEANCRT_CAPTURE_FOREGROUND  33007
 #define IDM_LEANCRT_RELOAD              33008
 #define IDM_LEANCRT_SETUP               33009
+#define IDM_LEANCRT_AUTO_FOREGROUND     33010
 
 // Next default values for new objects
 // 

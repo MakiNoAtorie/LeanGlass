@@ -79,6 +79,13 @@ std::filesystem::path DataDir()
     return AppDir() / L"leancrt";
 }
 
+bool IsNativeMode()
+{
+    std::error_code ec;
+    return std::filesystem::exists(AppDir() / L"native" / L"backend.flag", ec) &&
+        !std::filesystem::exists(AppDir() / L"dxgi.dll", ec);
+}
+
 const wchar_t* PresetName(Preset preset)
 {
     switch (preset)
@@ -109,6 +116,17 @@ const wchar_t* PresetFile(Preset preset)
     return L"Retro.ini";
 }
 
+std::optional<Preset> ParsePreset(const std::wstring& name)
+{
+    if (name == L"Retro") return Preset::Retro;
+    if (name == L"Retro 4:3") return Preset::Retro43;
+    if (name == L"Modern") return Preset::Modern;
+    if (name == L"Modern 4:3") return Preset::Modern43;
+    if (name == L"Arcade") return Preset::Arcade;
+    if (name == L"Off") return Preset::Off;
+    return std::nullopt;
+}
+
 bool EnsureInstalled(std::wstring& error)
 {
     std::error_code ec;
@@ -118,7 +136,7 @@ bool EnsureInstalled(std::wstring& error)
 
     // Native backend: no ReShade DLL or .ini files are needed. The generated
     // HLSL next to the executable is the whole shader dependency.
-    if (!std::filesystem::exists(app / L"dxgi.dll", ec))
+    if (IsNativeMode())
     {
         const auto nativeShader = app / L"native" / L"LeanCRT.hlsl";
         if (!std::filesystem::exists(nativeShader, ec))
@@ -215,13 +233,7 @@ Preset LoadSavedPreset()
     wchar_t value[64] = {};
     GetPrivateProfileStringW(L"LeanCRT", L"Preset", L"Retro", value, 64, SettingsPath().c_str());
 
-    const std::wstring saved(value);
-    if (saved == L"Retro 4:3") return Preset::Retro43;
-    if (saved == L"Modern") return Preset::Modern;
-    if (saved == L"Modern 4:3") return Preset::Modern43;
-    if (saved == L"Arcade") return Preset::Arcade;
-    if (saved == L"Off") return Preset::Off;
-    return Preset::Retro;
+    return ParsePreset(value).value_or(Preset::Retro);
 }
 
 void SavePreset(Preset preset)
@@ -229,5 +241,17 @@ void SavePreset(Preset preset)
     std::error_code ec;
     std::filesystem::create_directories(DataDir(), ec);
     WritePrivateProfileStringW(L"LeanCRT", L"Preset", PresetName(preset), SettingsPath().c_str());
+}
+
+bool LoadAutoForeground()
+{
+    return GetPrivateProfileIntW(L"LeanCRT", L"AutoForeground", 0, SettingsPath().c_str()) != 0;
+}
+
+void SaveAutoForeground(bool enabled)
+{
+    std::error_code ec;
+    std::filesystem::create_directories(DataDir(), ec);
+    WritePrivateProfileStringW(L"LeanCRT", L"AutoForeground", enabled ? L"1" : L"0", SettingsPath().c_str());
 }
 }

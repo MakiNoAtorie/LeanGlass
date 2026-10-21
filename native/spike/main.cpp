@@ -232,6 +232,9 @@ StageBindings Reflect(ID3DBlob* blob, const Texture* textures, ID3D11SamplerStat
         D3D11_SHADER_INPUT_BIND_DESC bind = {};
         Check(reflection->GetResourceBindingDesc(i, &bind), "GetResourceBindingDesc");
 
+        if (std::strstr(bind.Name, "samplerFinal") != nullptr)
+            std::cout << "  binding " << bind.Name << " -> t" << bind.BindPoint << "\n";
+
         switch (bind.Type)
         {
         case D3D_SIT_TEXTURE:
@@ -366,6 +369,32 @@ void WriteBmp(const char* path, const uint8_t* rgba, UINT width, UINT height, UI
         }
         file.write(reinterpret_cast<const char*>(row.data()), row.size());
     }
+}
+
+void SaveTextureBmp(ID3D11Device* device, ID3D11DeviceContext* context, Texture& texture, const char* path)
+{
+    D3D11_TEXTURE2D_DESC desc = {};
+    texture.tex->GetDesc(&desc);
+    if (desc.Format != DXGI_FORMAT_R8G8B8A8_UNORM)
+        return;
+
+    D3D11_TEXTURE2D_DESC staging_desc = desc;
+    staging_desc.Usage          = D3D11_USAGE_STAGING;
+    staging_desc.BindFlags      = 0;
+    staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    staging_desc.MiscFlags      = 0;
+
+    ComPtr<ID3D11Texture2D> staging;
+    if (FAILED(device->CreateTexture2D(&staging_desc, nullptr, &staging)))
+        return;
+    context->CopyResource(staging.Get(), texture.tex.Get());
+
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+        return;
+
+    WriteBmp(path, static_cast<const uint8_t*>(mapped.pData), texture.w, texture.h, mapped.RowPitch);
+    context->Unmap(staging.Get(), 0);
 }
 } // namespace
 
@@ -585,6 +614,7 @@ int main()
             context->CSSetUnorderedAccessViews(0, 2, no_uavs, nullptr);
             PrintAverage(device.Get(), context.Get(), textures[T_BLOOM_HORIZ], "BloomHoriz");
             PrintAverage(device.Get(), context.Get(), textures[T_FINAL], "Final");
+            SaveTextureBmp(device.Get(), context.Get(), textures[T_FINAL], "final.bmp");
             continue;
         }
 
@@ -617,6 +647,8 @@ int main()
         PrintAverage(device.Get(), context.Get(), textures[pass.rt0], pass.name);
         if (pass.rt1 >= 0)
             PrintAverage(device.Get(), context.Get(), textures[pass.rt1], "PhosphorBlue");
+        if (std::strcmp(pass.name, "Output") == 0)
+            SaveTextureBmp(device.Get(), context.Get(), textures[T_OUTPUT], "output.bmp");
     }
 
     context->OMSetRenderTargets(0, nullptr, nullptr);

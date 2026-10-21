@@ -27,5 +27,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-spike
-          path: native-spike.bmp
+          path: |
+            native-spike.bmp
+            final.bmp
+            output.bmp
           if-no-files-found: warn

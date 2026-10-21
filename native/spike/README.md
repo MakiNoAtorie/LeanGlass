@@ -28,3 +28,20 @@ WARP software renderer when no hardware device is present.
 The pass table mirrors the fused-bloom D3D11 permutation: 16 passes, MRT for
 the phosphor mask, and one compute dispatch for the final bloom. The next step
 is to feed it a captured frame and move the executor into LeanGlass.
+
+## Result
+
+All 16 passes execute and the raster composite contains the finished masked
+image. A 4x zoom of the white bar shows the vertical RGB phosphor grid and
+horizontal scanlines; a pure green bar correctly shows only green modulation
+because there is no red or blue signal to light.
+
+LeanCRT's own `Output` pass samples black in this harness, so the spike uses a
+small final blit from the raster composite to the 8-bit output. The app should
+keep that blit for the straight path and use LeanCRT's geometry/output passes
+for curved output once the Output-pass issue is resolved.
+
+The mask is generated one 1/64-wide vertical segment per frame; the harness
+prewarms all 64 segments before rendering the still.
+
+

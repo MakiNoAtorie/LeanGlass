@@ -80,6 +80,22 @@ prefixed `V__`), and the pass entry points are ordinary `vs_5_0`/`ps_5_0`/
 points to DXBC at build time, reflect the constant buffer once, fill it from
 LeanGlass preset data, and run the fixed pass graph.
 
+The spec-constant build (`--spec-constants`) is even simpler: every uniform
+becomes a compile-time `#define`, leaving only `frame_count` in a tiny constant
+buffer. That removes runtime uniform management entirely; a preset becomes a
+set of compiled shaders.
+
+A first D3D11 harness in `native/spike/` runs the raster permutation of the
+pass graph and produces a CRT-filtered still without ReShade. A 4x zoom of a
+white bar shows the phosphor grid and scanlines. Two findings: `BeamLookup`
+only rebuilds its LUT every 60 frames, and the mask is generated in 64
+vertical segments over 64 frames, so the harness prewarms it. LeanCRT's own
+`Output` pass is black in the harness; a small final blit from the raster
+composite works for flat output. Curved output still needs the unmodified
+geometry/output passes.
+
+
+
 ## What is deliberately not in scope
 
 - Editing LeanCRT shader source.

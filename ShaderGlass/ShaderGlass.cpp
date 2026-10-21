@@ -611,72 +611,6 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         return;
     }
 
-    if(m_nativeMode)
-    {
-        if(m_nativeResetPending.exchange(false, std::memory_order_acq_rel))
-        {
-            m_nativeLeanCRT.reset();
-            std::lock_guard lock(m_nativeErrorMutex);
-            m_nativeError.clear();
-        }
-
-        const int  nativePreset  = m_nativePreset.load(std::memory_order_relaxed);
-        const bool nativeEnabled = m_nativeEnabled.load(std::memory_order_relaxed);
-
-        if(!m_nativeLeanCRT)
-        {
-            wchar_t modulePath[MAX_PATH] = {};
-            GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
-            const wchar_t* nativeFile = L"LeanCRT.hlsl";
-            switch(nativePreset)
-            {
-            case 1: nativeFile = L"LeanCRT-Retro43.hlsl"; break;
-            case 2: nativeFile = L"LeanCRT-Modern.hlsl"; break;
-            case 3: nativeFile = L"LeanCRT-Modern43.hlsl"; break;
-            case 4: nativeFile = L"LeanCRT-Arcade.hlsl"; break;
-            default: break;
-            }
-            const auto hlslPath = std::filesystem::path(modulePath).parent_path() / L"native" / nativeFile;
-
-            m_nativeLeanCRT = std::make_unique<NativeLeanCRT>();
-            std::wstring nativeError;
-            if(!m_nativeLeanCRT->Initialize(m_device.get(), m_context.get(), hlslPath.wstring(), nativeError))
-            {
-                OutputDebugStringW((L"Native LeanCRT init failed: " + nativeError + L"\n").c_str());
-                {
-                    std::lock_guard lock(m_nativeErrorMutex);
-                    m_nativeError = nativeError;
-                }
-                m_nativeLeanCRT.reset();
-                m_nativeMode = false;
-            }
-            else
-            {
-                m_nativeLeanCRT->SetOutputPass(nativePreset == 4);
-                m_nativeLeanCRT->SetEnabled(nativeEnabled);
-            }
-        }
-
-        if(m_nativeLeanCRT && m_displayRenderTarget)
-        {
-            m_nativeLeanCRT->SetEnabled(nativeEnabled);
-            winrt::com_ptr<ID3D11ShaderResourceView> inputView;
-            if(SUCCEEDED(m_device->CreateShaderResourceView(texture.get(), nullptr, inputView.put())))
-            {
-                m_nativeLeanCRT->Render(inputView.get(), m_displayRenderTarget.get(),
-                    static_cast<UINT>(clientRect.right), static_cast<UINT>(clientRect.bottom));
-                FinishFrame();
-                return;
-            }
-
-            {
-                std::lock_guard lock(m_nativeErrorMutex);
-                m_nativeError = L"Could not create a shader resource view for the captured frame.";
-            }
-            m_nativeMode = false;
-        }
-    }
-
     auto clientWidth  = clientRect.right;
     auto clientHeight = clientRect.bottom;
 
@@ -1189,6 +1123,71 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
                 }
                 m_preprocessPass.RenderCursor(cx, cy, cw, ch, cursor->view);
             }
+        }
+    }
+
+    if(m_nativeMode)
+    {
+        if(m_nativeResetPending.exchange(false, std::memory_order_acq_rel))
+        {
+            m_nativeLeanCRT.reset();
+            std::lock_guard lock(m_nativeErrorMutex);
+            m_nativeError.clear();
+        }
+
+        const int  nativePreset  = m_nativePreset.load(std::memory_order_relaxed);
+        const bool nativeEnabled = m_nativeEnabled.load(std::memory_order_relaxed);
+
+        if(!m_nativeLeanCRT)
+        {
+            wchar_t modulePath[MAX_PATH] = {};
+            GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+            const wchar_t* nativeFile = L"LeanCRT.hlsl";
+            switch(nativePreset)
+            {
+            case 1: nativeFile = L"LeanCRT-Retro43.hlsl"; break;
+            case 2: nativeFile = L"LeanCRT-Modern.hlsl"; break;
+            case 3: nativeFile = L"LeanCRT-Modern43.hlsl"; break;
+            case 4: nativeFile = L"LeanCRT-Arcade.hlsl"; break;
+            default: break;
+            }
+            const auto hlslPath = std::filesystem::path(modulePath).parent_path() / L"native" / nativeFile;
+
+            m_nativeLeanCRT = std::make_unique<NativeLeanCRT>();
+            std::wstring nativeError;
+            if(!m_nativeLeanCRT->Initialize(m_device.get(), m_context.get(), hlslPath.wstring(), nativeError))
+            {
+                OutputDebugStringW((L"Native LeanCRT init failed: " + nativeError + L"\n").c_str());
+                {
+                    std::lock_guard lock(m_nativeErrorMutex);
+                    m_nativeError = nativeError;
+                }
+                m_nativeLeanCRT.reset();
+                m_nativeMode = false;
+            }
+            else
+            {
+                m_nativeLeanCRT->SetOutputPass(nativePreset == 4);
+                m_nativeLeanCRT->SetEnabled(nativeEnabled);
+            }
+        }
+
+        if(m_nativeLeanCRT && m_displayRenderTarget)
+        {
+            m_nativeLeanCRT->SetEnabled(nativeEnabled);
+            if(m_originalView)
+            {
+                m_nativeLeanCRT->Render(m_originalView.get(), m_displayRenderTarget.get(),
+                    static_cast<UINT>(clientRect.right), static_cast<UINT>(clientRect.bottom));
+                FinishFrame();
+                return;
+            }
+
+            {
+                std::lock_guard lock(m_nativeErrorMutex);
+                m_nativeError = L"Preprocessing did not produce a texture for the native renderer.";
+            }
+            m_nativeMode = false;
         }
     }
 

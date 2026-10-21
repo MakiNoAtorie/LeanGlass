@@ -5,6 +5,9 @@ renderer, integration, build/CI, UX, performance, parity, shader binding,
 robustness). This file is the consolidated plan; checkboxes are updated as
 fixes land.
 
+Runtime visual verification of preprocessing parity and the HDR guard is still
+pending on Windows; CI only checks that the build succeeds.
+
 ## Fixed in this pass
 
 - [x] **P0 — swapchain rebuilt every frame.** `ShaderGlass::Process` now
@@ -33,6 +36,13 @@ fixes land.
 - [x] **P2 — dead GeometryCache pass.** Removed from the native table; it wrote
   a target nothing sampled.
 - [x] **P2 — unused preblur textures.** Removed (preblur is compiled out).
+- [x] **P0 — native mode bypassed preprocessing.** The native tap now runs
+  after `m_preprocessPass.Render` and cursor compositing and consumes
+  `m_originalView`, so pixel size, crop, flip, vertical and cursor settings
+  apply to native output. The ShaderGlass shader chain is still skipped.
+- [x] **P1 — HDR captured for an SDR native renderer.** Native sessions force
+  `useHDR` off at startup (menu unchecked, ReShade registry state untouched);
+  the ReShade path keeps its current HDR behavior.
 
 ## Fixed in v0.2.2
 
@@ -56,9 +66,6 @@ fixes land.
 - [ ] Arcade curvature via `geom_mode=1` + GeometryCache + Output.
 - [ ] Resolution-specific compiles or a 1:1 output path; the 1080p internal
   target currently upscales at 1440p/4K and downscales the mask at 720p.
-- [ ] Move the native tap behind the preprocessing pass so crop, locked area,
-  flip, rotation and pixel size work again (or disable those controls clearly).
-- [ ] HDR: force SDR for native or emit linear/PQ correctly.
 
 ## Next: robustness and UX
 

@@ -2962,12 +2962,20 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     }
     if(GetUseHDRState())
     {
-        CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND | MF_CHECKED);
-        m_captureOptions.useHDR = true;
+        if(m_nativeMode)
+        {
+            m_captureOptions.useHDR = false;
+            CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND | MF_UNCHECKED);
+        }
+        else
+        {
+            CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND | MF_CHECKED);
+            m_captureOptions.useHDR = true;
 
-        CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_CHECKED);
-        EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_GRAYED);
-        m_captureOptions.flipMode = true;
+            CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_CHECKED);
+            EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_GRAYED);
+            m_captureOptions.flipMode = true;
+        }
     }
     else if(GetFlipModeState())
     {

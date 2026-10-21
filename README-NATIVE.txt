@@ -28,6 +28,9 @@ Current limits
   1440x1080 content box; the final blit scales to the window.
 - Arcade runs LeanCRT's real Output/geometry pass; the other presets use the
   straight blit.
+- Native mode always captures SDR. Advanced > Use HDR is unchecked at startup
+  because the LeanCRT pipeline is SDR only; the saved ReShade state is not
+  changed.
 - Do not put a dxgi.dll next to this exe. ReShade would inject and stack on the
   native output.
 

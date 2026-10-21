@@ -312,6 +312,15 @@ void PrintAverage(ID3D11Device* device, ID3D11DeviceContext* context, Texture& t
                 sum += p[0] / 65535.0;
                 ++count;
             }
+            else if (desc.Format == DXGI_FORMAT_R10G10B10A2_UNORM)
+            {
+                const uint32_t p = reinterpret_cast<const uint32_t*>(row)[x];
+                const double r = (p & 0x3ff) / 1023.0;
+                const double g = ((p >> 10) & 0x3ff) / 1023.0;
+                const double b = ((p >> 20) & 0x3ff) / 1023.0;
+                sum += (r + g + b) / 3.0;
+                ++count;
+            }
         }
     }
 
@@ -539,6 +548,8 @@ int main()
     const float clear[4] = { 0, 0, 0, 1 };
     UINT frame = 1;
     UploadFrameCount(context.Get(), frame_cb.Get(), frame);
+
+    PrintAverage(device.Get(), context.Get(), textures[T_INPUT], "Input");
 
     for (const Pass& pass : passes)
     {

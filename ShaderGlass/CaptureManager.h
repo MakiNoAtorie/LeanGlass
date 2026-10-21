@@ -73,6 +73,7 @@ public:
     void  UpdateFrameSkip();
     void  SetNativeMode(bool nativeMode);
     void  SetNativeEnabled(bool enabled);
+    void  SetNativePreset(int preset);
     void  ReloadNative();
     bool  TakeNativeError(std::wstring& error);
     bool  UpdateInput();
@@ -109,6 +110,7 @@ private:
     std::unique_ptr<ShaderGlass>                      m_shaderGlass {nullptr};
     bool     m_nativeMode {false};
     bool     m_nativeEnabled {true};
+    int      m_nativePreset {0};
     std::vector<std::unique_ptr<PresetDef>>           m_presetList;
     std::vector<std::tuple<int, std::string, double>> m_queuedParams;
     std::vector<std::tuple<int, std::string, double>> m_lastParams;

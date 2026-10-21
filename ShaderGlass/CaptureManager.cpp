@@ -158,6 +158,7 @@ bool CaptureManager::StartSession()
     UpdateCroppedArea();
     m_shaderGlass->SetNativeMode(m_nativeMode);
     m_shaderGlass->SetNativeEnabled(m_nativeEnabled);
+    m_shaderGlass->SetNativePreset(m_nativePreset);
     UpdateVertical();
 
     if(m_options.imageFile.size())
@@ -451,6 +452,13 @@ void CaptureManager::SetNativeEnabled(bool enabled)
     m_nativeEnabled = enabled;
     if(m_shaderGlass)
         m_shaderGlass->SetNativeEnabled(enabled);
+}
+
+void CaptureManager::SetNativePreset(int preset)
+{
+    m_nativePreset = preset;
+    if(m_shaderGlass)
+        m_shaderGlass->SetNativePreset(preset);
 }
 
 void CaptureManager::ReloadNative()

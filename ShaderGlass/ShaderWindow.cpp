@@ -16,6 +16,11 @@ GNU General Public License v3.0
 
 #define TIMER_TITLE 0
 
+static bool Is43Preset(LeanCRT::Preset preset)
+{
+    return preset == LeanCRT::Preset::Retro43 || preset == LeanCRT::Preset::Modern43;
+}
+
 ShaderWindow::ShaderWindow(CaptureManager& captureManager) :
     m_captureManager(captureManager), m_captureOptions(captureManager.m_options), m_title(), m_windowClass(), m_toggledNone(false)
 { }
@@ -1018,18 +1023,6 @@ void ShaderWindow::BuildLeanCRTMenu()
     AppendMenuW(m_leanCRTMenu, MF_STRING, IDM_LEANCRT_SETUP, L"Setup / troubleshooting...");
     InsertMenuW(m_mainMenu, 4, MF_BYPOSITION | MF_POPUP, (UINT_PTR)m_leanCRTMenu, L"LeanCRT");
 
-    if(m_nativeMode)
-    {
-        // Native backend v1 renders the Retro look only. Keep Enabled, Retro,
-        // Off, Reload and Setup usable; gray only the presets that need the
-        // ReShade preset files.
-        InsertMenuW(m_leanCRTMenu, 2, MF_BYPOSITION | MF_STRING | MF_GRAYED, 0, L"Native backend - Retro only");
-        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_RETRO43, MF_BYCOMMAND | MF_GRAYED);
-        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_MODERN, MF_BYCOMMAND | MF_GRAYED);
-        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_MODERN43, MF_BYCOMMAND | MF_GRAYED);
-        EnableMenuItem(m_leanCRTMenu, IDM_LEANCRT_ARCADE, MF_BYCOMMAND | MF_GRAYED);
-    }
-
     UpdateLeanCRTMenu();
 }
 
@@ -1060,18 +1053,20 @@ void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
 {
     if(m_nativeMode)
     {
-        if(preset != LeanCRT::Preset::Retro && preset != LeanCRT::Preset::Off)
-        {
-            UpdateLeanCRTMenu();
-            return;
-        }
+        const bool was43 = Is43Preset(m_leanCRTPreset);
 
         m_leanCRTPreset  = preset;
         m_leanCRTEnabled = preset != LeanCRT::Preset::Off;
         if(m_leanCRTEnabled)
-            m_lastLeanCRTPreset = LeanCRT::Preset::Retro;
+        {
+            m_lastLeanCRTPreset = preset;
+            m_captureManager.SetNativePreset(static_cast<int>(preset));
+        }
         m_captureManager.SetNativeEnabled(m_leanCRTEnabled);
         UpdateLeanCRTMenu();
+        UpdateTitle();
+        if(was43 || Is43Preset(preset))
+            ResizeToContentAspect(m_mainWindow);
         return;
     }
 
@@ -1407,6 +1402,13 @@ void ShaderWindow::AdjustWindowSize(HWND hWnd)
         if(requiredH == 0)
             requiredH = 1;
 
+        if(m_nativeMode && Is43Preset(m_leanCRTPreset))
+        {
+            const double aspect = ContentAspect();
+            if(aspect > 0)
+                requiredH = static_cast<LONG>(roundf(static_cast<float>(requiredW / aspect)));
+        }
+
         if(r.right != requiredW || r.bottom != requiredH)
         {
             r.right  = requiredW;
@@ -1464,6 +1466,187 @@ void ShaderWindow::AdjustWindowSize(HWND hWnd)
             }
         }
     }
+}
+
+double ShaderWindow::ContentAspect()
+{
+    if(Is43Preset(m_leanCRTPreset))
+        return 4.0 / 3.0;
+
+    LONG inputWidth = 0, inputHeight = 0;
+    m_captureManager.GetCaptureSize(inputWidth, inputHeight);
+    if(inputWidth <= 0 || inputHeight <= 0)
+    {
+        if(!m_captureOptions.imageFile.empty())
+        {
+            inputWidth  = m_captureOptions.imageWidth;
+            inputHeight = m_captureOptions.imageHeight;
+        }
+        else if(m_captureOptions.captureWindow && m_captureOptions.captureWindow != HWND_BROADCAST)
+        {
+            RECT captureRect;
+            if(GetClientRect(m_captureOptions.captureWindow, &captureRect))
+            {
+                inputWidth  = captureRect.right;
+                inputHeight = captureRect.bottom;
+            }
+        }
+    }
+
+    inputWidth -= (m_captureOptions.croppedArea.left + m_captureOptions.croppedArea.right);
+    inputHeight -= (m_captureOptions.croppedArea.top + m_captureOptions.croppedArea.bottom);
+    if(inputWidth <= 0 || inputHeight <= 0)
+        return 0;
+
+    double aspect = static_cast<double>(inputWidth) / inputHeight;
+    if(m_captureOptions.aspectRatio > 0)
+        aspect /= m_captureOptions.aspectRatio;
+    return aspect > 0 ? aspect : 0;
+}
+
+void ShaderWindow::ApplyProportionalSizing(RECT* rect, WPARAM edge)
+{
+    const double aspect = ContentAspect();
+    if(edge < WMSZ_LEFT || edge > WMSZ_BOTTOMRIGHT || aspect <= 0)
+        return;
+
+    RECT frame = {0, 0, 0, 0};
+    AdjustWindowRectExForDpi(&frame,
+                             GetWindowLong(m_mainWindow, GWL_STYLE),
+                             GetMenu(m_mainWindow) != nullptr,
+                             GetWindowLong(m_mainWindow, GWL_EXSTYLE),
+                             GetDpiForWindow(m_mainWindow));
+    const LONG frameW = frame.right - frame.left;
+    const LONG frameH = frame.bottom - frame.top;
+
+    LONG clientW = (rect->right - rect->left) - frameW;
+    LONG clientH = (rect->bottom - rect->top) - frameH;
+    if(clientW <= 0)
+        clientW = 1;
+    if(clientH <= 0)
+        clientH = 1;
+
+    bool widthDrives = true;
+    switch(edge)
+    {
+    case WMSZ_TOP:
+    case WMSZ_BOTTOM:
+        widthDrives = false;
+        break;
+    case WMSZ_TOPLEFT:
+    case WMSZ_TOPRIGHT:
+    case WMSZ_BOTTOMLEFT:
+    case WMSZ_BOTTOMRIGHT: {
+        const double widthError  = clientW > clientH * aspect ? clientW - clientH * aspect : clientH * aspect - clientW;
+        const double heightError = clientH > clientW / aspect ? clientH - clientW / aspect : clientW / aspect - clientH;
+        widthDrives              = widthError >= heightError;
+        break;
+    }
+    default:
+        break;
+    }
+
+    if(widthDrives)
+        clientH = static_cast<LONG>(roundf(static_cast<float>(clientW / aspect)));
+    else
+        clientW = static_cast<LONG>(roundf(static_cast<float>(clientH * aspect)));
+
+    const LONG minClient = 32;
+    if(clientW < minClient || clientH < minClient)
+    {
+        if(aspect >= 1.0)
+        {
+            clientH = minClient;
+            clientW = static_cast<LONG>(roundf(static_cast<float>(minClient * aspect)));
+        }
+        else
+        {
+            clientW = minClient;
+            clientH = static_cast<LONG>(roundf(static_cast<float>(minClient / aspect)));
+        }
+    }
+
+    switch(edge)
+    {
+    case WMSZ_LEFT:
+        rect->left   = rect->right - (clientW + frameW);
+        rect->bottom = rect->top + (clientH + frameH);
+        break;
+    case WMSZ_RIGHT:
+        rect->right  = rect->left + (clientW + frameW);
+        rect->bottom = rect->top + (clientH + frameH);
+        break;
+    case WMSZ_TOP:
+        rect->right = rect->left + (clientW + frameW);
+        rect->top   = rect->bottom - (clientH + frameH);
+        break;
+    case WMSZ_BOTTOM:
+        rect->right  = rect->left + (clientW + frameW);
+        rect->bottom = rect->top + (clientH + frameH);
+        break;
+    case WMSZ_TOPLEFT:
+        rect->left = rect->right - (clientW + frameW);
+        rect->top  = rect->bottom - (clientH + frameH);
+        break;
+    case WMSZ_TOPRIGHT:
+        rect->right = rect->left + (clientW + frameW);
+        rect->top   = rect->bottom - (clientH + frameH);
+        break;
+    case WMSZ_BOTTOMLEFT:
+        rect->left   = rect->right - (clientW + frameW);
+        rect->bottom = rect->top + (clientH + frameH);
+        break;
+    case WMSZ_BOTTOMRIGHT:
+        rect->right  = rect->left + (clientW + frameW);
+        rect->bottom = rect->top + (clientH + frameH);
+        break;
+    }
+}
+
+void ShaderWindow::ResizeToContentAspect(HWND hWnd)
+{
+    if(!hWnd || m_isBorderless || IsZoomed(hWnd))
+        return;
+    if(!(GetWindowLong(hWnd, GWL_STYLE) & WS_THICKFRAME))
+        return;
+
+    const double aspect = ContentAspect();
+    if(aspect <= 0)
+        return;
+
+    RECT clientRect;
+    GetClientRect(hWnd, &clientRect);
+    LONG clientW = clientRect.right;
+    LONG clientH = static_cast<LONG>(roundf(static_cast<float>(clientW / aspect)));
+
+    const LONG minClient = 32;
+    if(clientW < minClient || clientH < minClient)
+    {
+        if(aspect >= 1.0)
+        {
+            clientH = minClient;
+            clientW = static_cast<LONG>(roundf(static_cast<float>(minClient * aspect)));
+        }
+        else
+        {
+            clientW = minClient;
+            clientH = static_cast<LONG>(roundf(static_cast<float>(minClient / aspect)));
+        }
+    }
+
+    RECT windowRect = {0, 0, clientW, clientH};
+    AdjustWindowRectExForDpi(&windowRect,
+                             GetWindowLong(hWnd, GWL_STYLE),
+                             GetMenu(hWnd) != nullptr,
+                             GetWindowLong(hWnd, GWL_EXSTYLE),
+                             GetDpiForWindow(hWnd));
+    SetWindowPos(hWnd,
+                 nullptr,
+                 0,
+                 0,
+                 windowRect.right - windowRect.left,
+                 windowRect.bottom - windowRect.top,
+                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
 void ShaderWindow::UpdateWindowState()
@@ -1566,7 +1749,7 @@ void ShaderWindow::UpdateTitle()
                      advancedFlags);
         if(m_nativeMode)
         {
-            _snwprintf_s(title, 200, _T("LeanGlass native (Retro, %s~%dfps)"), windowName, outFPS);
+            _snwprintf_s(title, 200, _T("LeanGlass native (%s, %s~%dfps)"), LeanCRT::PresetName(m_leanCRTPreset), windowName, outFPS);
         }
         SetWindowTextW(m_mainWindow, title);
     }
@@ -2422,9 +2605,12 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
         SetFreeScale();
         return 0;
     case WM_ERASEBKGND:
-    case WM_SIZING: {
         // prevent flicker
         return 0;
+    case WM_SIZING: {
+        if(!m_isBorderless)
+            ApplyProportionalSizing(reinterpret_cast<RECT*>(lParam), wParam);
+        return TRUE;
     }
     case WM_LBUTTONDOWN: {
         if(m_captureManager.IsActive() && m_captureOptions.captureWindow)
@@ -2707,12 +2893,14 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     m_captureManager.SetNativeMode(m_nativeMode);
 
     m_leanCRTPreset = LeanCRT::LoadSavedPreset();
-    if(m_nativeMode)
-        m_leanCRTPreset = LeanCRT::Preset::Retro;
-    m_leanCRTEnabled = m_nativeMode || m_leanCRTPreset != LeanCRT::Preset::Off;
+    m_leanCRTEnabled = m_leanCRTPreset != LeanCRT::Preset::Off;
     m_lastLeanCRTPreset = m_leanCRTEnabled ? m_leanCRTPreset : LeanCRT::Preset::Retro;
     if(m_nativeMode)
+    {
         m_captureManager.SetNativeEnabled(m_leanCRTEnabled);
+        if(m_leanCRTEnabled)
+            m_captureManager.SetNativePreset(static_cast<int>(m_leanCRTPreset));
+    }
 
     BuildProgramMenu();
     BuildInputMenu();
@@ -2858,6 +3046,8 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
             }
         }
     }
+    if(m_nativeMode && Is43Preset(m_leanCRTPreset))
+        ResizeToContentAspect(m_mainWindow);
     return TRUE;
 }
 

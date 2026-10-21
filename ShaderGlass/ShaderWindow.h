@@ -123,6 +123,9 @@ private:
     void         ShowLeanCRTSetupInfo();
     void         SetTransparent(bool transparent);
     void         AdjustWindowSize(HWND hWnd);
+    double       ContentAspect();
+    void         ApplyProportionalSizing(RECT* rect, WPARAM edge);
+    void         ResizeToContentAspect(HWND hWnd);
     void         UpdateWindowState();
     void         ToggleBorderless(HWND hWnd);
     bool         Start();

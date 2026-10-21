@@ -429,13 +429,13 @@ bool NativeLeanCRT::Initialize(ID3D11Device* device, ID3D11DeviceContext* contex
     const char* vs_entries[] = {
         "F__calculateBeamDistsVS", "F__leanCachedBeamVS", "F__PostProcessVS", "F__blurVerticalVS",
         "F__blurHorizontalVS", "F__deinterlaceVS", "F__freezeFrameVS", "F__generatePhosphorMaskVS",
-        "F__brightpassVS", "F__leanBloomVerticalVS", "F__bloomHorizontalVS",
+        "F__brightpassVS", "F__leanBloomVerticalVS", "F__bloomHorizontalVS", "F__leanOutputVS",
     };
     const char* ps_entries[] = {
         "F__calculateBeamDistsPS", "F__leanCachedBeamPS", "F__leanBeamsPS", "F__leanApproxBloomPS",
         "F__blurVerticalPS", "F__blurHorizontalPS", "F__deinterlacePS", "F__freezeFramePS",
         "F__leanPhosphorPS", "F__leanMaskPS", "F__brightpassPS", "F__leanBloomVerticalPS",
-        "F__bloomHorizontalPS",
+        "F__bloomHorizontalPS", "F__leanOutputPS",
     };
 
     for (const char* entry : vs_entries)
@@ -570,7 +570,8 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
         m_context->Draw(4, 0);
     }
 
-    // Final blit: mask composite (RGBA16, 1080p) to the window backbuffer.
+    // Final output: Arcade runs LeanCRT's real Output pass so the geometry
+    // uniforms bend the image. The straight presets keep the temporary blit.
     ID3D11RenderTargetView* backbuffer = output;
     m_context->OMSetRenderTargets(1, &backbuffer, nullptr);
 
@@ -583,19 +584,38 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
     m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
     std::wstring error;
-    ComPtr<ID3D11VertexShader> vs = GetVS("F__PostProcessVS", error);
-    if (!vs || !m_blit_ps)
-        return;
+    bool         rendered = false;
+    if (m_outputPass)
+    {
+        ComPtr<ID3D11VertexShader> outputVs = GetVS("F__leanOutputVS", error);
+        ComPtr<ID3D11PixelShader>  outputPs = GetPS("F__leanOutputPS", error);
+        if (outputVs && outputPs)
+        {
+            m_context->VSSetShader(outputVs.Get(), nullptr, 0);
+            m_context->PSSetShader(outputPs.Get(), nullptr, 0);
+            BindGraphics(m_vs_bind["F__leanOutputVS"], false);
+            BindGraphics(m_ps_bind["F__leanOutputPS"], true);
+            m_context->Draw(4, 0);
+            rendered = true;
+        }
+    }
 
-    m_context->VSSetShader(vs.Get(), nullptr, 0);
-    m_context->PSSetShader(m_blit_ps.Get(), nullptr, 0);
+    if (!rendered)
+    {
+        ComPtr<ID3D11VertexShader> vs = GetVS("F__PostProcessVS", error);
+        if (!vs || !m_blit_ps)
+            return;
 
-    ID3D11ShaderResourceView* srvs[T_COUNT] = {};
-    srvs[18] = m_textures[T_BLOOM_HORIZ].srv.Get();
-    ID3D11SamplerState* sampler = m_sampler_clamp.Get();
-    m_context->PSSetShaderResources(0, T_COUNT, srvs);
-    m_context->PSSetSamplers(0, 1, &sampler);
-    m_context->Draw(4, 0);
+        m_context->VSSetShader(vs.Get(), nullptr, 0);
+        m_context->PSSetShader(m_blit_ps.Get(), nullptr, 0);
+
+        ID3D11ShaderResourceView* srvs[T_COUNT] = {};
+        srvs[18] = m_textures[T_BLOOM_HORIZ].srv.Get();
+        ID3D11SamplerState* sampler = m_sampler_clamp.Get();
+        m_context->PSSetShaderResources(0, T_COUNT, srvs);
+        m_context->PSSetSamplers(0, 1, &sampler);
+        m_context->Draw(4, 0);
+    }
 
     // Leave no RTV/SRV references on the context. ResizeBuffers fails while the
     // back buffer or intermediate views are still bound.

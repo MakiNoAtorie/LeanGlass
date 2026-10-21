@@ -40,6 +40,7 @@ public:
         m_nativeMode = nativeMode;
     }
     void  SetNativeEnabled(bool enabled);
+    void  SetNativePreset(int preset);
     void  ReloadNative();
     bool  TakeNativeError(std::wstring& error);
     void  SetFrameSkip(int s);
@@ -128,6 +129,7 @@ private:
     std::unique_ptr<NativeLeanCRT>                    m_nativeLeanCRT {nullptr};
     bool                                              m_nativeMode {false};
     bool                                              m_nativeEnabled {true};
+    int                                               m_nativePreset {0};
     std::mutex                                        m_nativeErrorMutex;
     std::wstring                                      m_nativeError;
     std::vector<std::tuple<int, std::string, double>> m_newParams;

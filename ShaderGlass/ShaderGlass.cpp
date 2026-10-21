@@ -39,6 +39,20 @@ void ShaderGlass::SetNativeEnabled(bool enabled)
         m_nativeLeanCRT->SetEnabled(enabled);
 }
 
+void ShaderGlass::SetNativePreset(int preset)
+{
+    std::lock_guard lock(m_mutex);
+    if(m_nativePreset == preset)
+        return;
+
+    m_nativePreset = preset;
+    m_nativeLeanCRT.reset();
+    {
+        std::lock_guard errorLock(m_nativeErrorMutex);
+        m_nativeError.clear();
+    }
+}
+
 void ShaderGlass::ReloadNative()
 {
     std::lock_guard lock(m_mutex);
@@ -615,9 +629,18 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         {
             wchar_t modulePath[MAX_PATH] = {};
             GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
-            const auto hlslPath = std::filesystem::path(modulePath).parent_path() / L"native" / L"LeanCRT.hlsl";
+            const wchar_t* nativeFile = L"LeanCRT.hlsl";
+            switch(m_nativePreset)
+            {
+            case 1: nativeFile = L"LeanCRT-Retro43.hlsl"; break;
+            case 2: nativeFile = L"LeanCRT-Modern.hlsl"; break;
+            case 3: nativeFile = L"LeanCRT-Modern43.hlsl"; break;
+            case 4: nativeFile = L"LeanCRT-Arcade.hlsl"; break;
+            default: break;
+            }
+            const auto hlslPath = std::filesystem::path(modulePath).parent_path() / L"native" / nativeFile;
 
-                m_nativeLeanCRT = std::make_unique<NativeLeanCRT>();
+            m_nativeLeanCRT = std::make_unique<NativeLeanCRT>();
             std::wstring nativeError;
             if(!m_nativeLeanCRT->Initialize(m_device.get(), m_context.get(), hlslPath.wstring(), nativeError))
             {
@@ -631,6 +654,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
             }
             else
             {
+                m_nativeLeanCRT->SetOutputPass(m_nativePreset == 4);
                 m_nativeLeanCRT->SetEnabled(m_nativeEnabled);
             }
         }

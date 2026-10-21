@@ -72,6 +72,7 @@ public:
     void  UpdateShaderPreset();
     void  UpdateFrameSkip();
     void  SetNativeMode(bool nativeMode);
+    bool  TakeNativeError(std::wstring& error);
     bool  UpdateInput();
     void  UpdateCursor();
     void  UpdateLockedArea();

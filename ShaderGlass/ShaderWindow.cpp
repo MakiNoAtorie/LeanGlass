@@ -1040,6 +1040,19 @@ void ShaderWindow::UpdateLeanCRTMenu()
     CheckMenuRadioItem(m_leanCRTMenu, IDM_LEANCRT_RETRO, IDM_LEANCRT_OFF, selected, MF_BYCOMMAND);
 }
 
+void ShaderWindow::CheckNativeError()
+{
+    std::wstring error;
+    if(!m_captureManager.TakeNativeError(error))
+        return;
+
+    m_nativeMode  = false;
+    m_leanCRTError = error;
+    MessageBoxW(m_mainWindow,
+        (L"Native LeanCRT could not start. The game is shown without the CRT effect.\n\n" + error).c_str(),
+        L"LeanCRT", MB_OK | MB_ICONERROR);
+}
+
 void ShaderWindow::ApplyLeanCRTPreset(LeanCRT::Preset preset)
 {
     if(m_nativeMode)
@@ -1120,6 +1133,19 @@ void ShaderWindow::CaptureForegroundWindow()
 
 void ShaderWindow::ShowLeanCRTSetupInfo()
 {
+    if(m_nativeMode)
+    {
+        std::wstring message =
+            L"LeanGlass is using the native LeanCRT backend.\n\n"
+            L"Required: native\\LeanCRT.hlsl next to LeanGlass.exe.\n"
+            L"This build has no dxgi.dll and no ReShade.ini.\n\n"
+            L"Native v1 renders the Retro look at 1080p internally. Presets, 4:3 and Arcade come next.";
+        if(!m_leanCRTError.empty())
+            message += L"\n\nLast error:\n" + m_leanCRTError;
+        MessageBoxW(m_mainWindow, message.c_str(), L"LeanCRT (native)", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+
     std::wstring message =
         L"LeanCRT needs two things next to LeanGlass.exe:\n\n"
         L"1. dxgi.dll - the ReShade engine (included in the release build).\n"
@@ -2423,7 +2449,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                         SetTransparent(true);
                         // TODO: check if mouse over parameters or browser window while they are visible? or is focus enough
                         auto focusedWindow = GetForegroundWindow();
-                        if(!m_inMenu && !m_inDialog && focusedWindow != m_browserWindow && focusedWindow != m_paramsWindow)
+                        if(!m_inMenu && !m_inDialog && !m_nativeMode && focusedWindow != m_browserWindow && focusedWindow != m_paramsWindow)
                             m_captureManager.HideCursor();
                         else
                             m_captureManager.ShowCursor();
@@ -2474,6 +2500,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             Screenshot();
             return 0;
         case TIMER_TITLE:
+            CheckNativeError();
             UpdateTitle();
             CheckAutoClose();
             return 0;
@@ -2655,6 +2682,7 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     m_nativeMode = !std::filesystem::exists(LeanCRT::AppDir() / L"dxgi.dll");
     if (!LeanCRT::EnsureInstalled(leanError))
         m_leanCRTError = leanError;
+    m_captureManager.SetNativeMode(m_nativeMode);
 
     m_leanCRTPreset = LeanCRT::LoadSavedPreset();
     m_leanCRTEnabled = m_leanCRTPreset != LeanCRT::Preset::Off;
@@ -3318,6 +3346,15 @@ void ShaderWindow::Start(_In_ LPWSTR lpCmdLine, HWND paramsWindow, HWND browserW
         {
             SetCaptureWindow(overrideInput);
         }
+    }
+
+    if(m_nativeMode && std::filesystem::exists(LeanCRT::AppDir() / L"dxgi.dll"))
+    {
+        m_nativeMode = false;
+        MessageBoxW(m_mainWindow,
+            L"Native mode cannot run while dxgi.dll is present.\n\n"
+            L"Remove or rename dxgi.dll to use the native backend, or drop -native to use ReShade.",
+            L"LeanGlass", MB_OK | MB_ICONWARNING);
     }
 
     m_paramsWindow  = paramsWindow;

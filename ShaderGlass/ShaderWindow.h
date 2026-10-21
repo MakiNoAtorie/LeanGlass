@@ -118,6 +118,7 @@ private:
     void         ApplyLeanCRTPreset(LeanCRT::Preset preset);
     void         UpdateLeanCRTMenu();
     void         ReloadLeanCRT();
+    void         CheckNativeError();
     void         CaptureForegroundWindow();
     void         ShowLeanCRTSetupInfo();
     void         SetTransparent(bool transparent);

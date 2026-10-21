@@ -22,6 +22,16 @@ ShaderGlass::ShaderGlass(CursorEmulator& cursorEmulator) :
     m_cursorEmulator(cursorEmulator)
 { }
 
+bool ShaderGlass::TakeNativeError(std::wstring& error)
+{
+    std::lock_guard lock(m_nativeErrorMutex);
+    if(m_nativeError.empty())
+        return false;
+
+    error.swap(m_nativeError);
+    return true;
+}
+
 ShaderGlass::~ShaderGlass()
 {
     std::unique_lock lock(m_mutex);
@@ -555,7 +565,9 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     textureRect.bottom = capturedTextureDesc.Height;
 
     auto outputResized = false;
-    outputResized      = TryResizeSwapChain(clientRect, m_outputRescaled);
+    const bool forceResize = m_outputRescaled;
+    m_outputRescaled = false;
+    outputResized = TryResizeSwapChain(clientRect, forceResize);
 
     if(clientRect.right <= 0 || clientRect.bottom <= 0)
     {
@@ -577,6 +589,10 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
             if(!m_nativeLeanCRT->Initialize(m_device.get(), m_context.get(), hlslPath.wstring(), nativeError))
             {
                 OutputDebugStringW((L"Native LeanCRT init failed: " + nativeError + L"\n").c_str());
+                {
+                    std::lock_guard lock(m_nativeErrorMutex);
+                    m_nativeError = nativeError;
+                }
                 m_nativeLeanCRT.reset();
                 m_nativeMode = false;
             }
@@ -592,6 +608,12 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
                 PresentFrame();
                 return;
             }
+
+            {
+                std::lock_guard lock(m_nativeErrorMutex);
+                m_nativeError = L"Could not create a shader resource view for the captured frame.";
+            }
+            m_nativeMode = false;
         }
     }
 

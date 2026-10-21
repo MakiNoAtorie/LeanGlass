@@ -34,6 +34,7 @@ private:
         const char* vs;
         const char* ps;
         int         rt;
+        int         rt1;
         bool        clear;
     };
 
@@ -60,6 +61,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler_clamp;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler_wrap_v;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler_border;
+    Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_rasterizer;
     Microsoft::WRL::ComPtr<ID3D11Buffer>       m_frame_cb;
     Microsoft::WRL::ComPtr<ID3D11PixelShader>  m_blit_ps;
 

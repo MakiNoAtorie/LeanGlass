@@ -26,6 +26,19 @@ constexpr UINT BLOOM_H = 270;
 constexpr UINT BEAM_W = 1024;
 constexpr UINT BEAM_H = 120;
 
+// Must cover the generated HLSL's _Globals block. The current raster
+// permutation declares frame_count plus four help/version ints (20 bytes);
+// keep 32 so future members cannot read past the buffer.
+struct FrameConstants
+{
+    UINT frame_count;
+    UINT overlay_active;
+    UINT version_2_1_0;
+    UINT basic_setup_help;
+    UINT content_box_help;
+    UINT padding[3];
+};
+
 enum TexId
 {
     T_INPUT,
@@ -254,6 +267,13 @@ void NativeLeanCRT::BindGraphics(const Bindings& bindings, bool pixel)
 
 bool NativeLeanCRT::Initialize(ID3D11Device* device, ID3D11DeviceContext* context, const std::wstring& hlslPath, std::wstring& error)
 {
+    m_ready = false;
+    if (!device || !context)
+    {
+        error = L"Native LeanCRT needs a valid D3D11 device and context.";
+        return false;
+    }
+
     m_device  = device;
     m_context = context;
     m_error.clear();
@@ -266,8 +286,6 @@ bool NativeLeanCRT::Initialize(ID3D11Device* device, ID3D11DeviceContext* contex
 
     const UINT srv_rtv = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
     m_textures[T_DEPTH]          = CreateTexture(1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
-    m_textures[T_PREBLUR_VERT]   = CreateTexture(W, H, DXGI_FORMAT_R16G16B16A16_UNORM, srv_rtv);
-    m_textures[T_PREBLUR_HORIZ]  = CreateTexture(W, H, DXGI_FORMAT_R16G16B16A16_UNORM, srv_rtv);
     m_textures[T_BEAM_DIST]      = CreateTexture(BEAM_W, BEAM_H, DXGI_FORMAT_R10G10B10A2_UNORM, srv_rtv);
     m_textures[T_ELECTRON_BEAMS] = CreateTexture(W, H, DXGI_FORMAT_R16G16B16A16_UNORM, srv_rtv);
     m_textures[T_BEAM_CONVERGENCE] = CreateTexture(W, H, DXGI_FORMAT_R16G16B16A16_UNORM, srv_rtv);
@@ -283,7 +301,6 @@ bool NativeLeanCRT::Initialize(ID3D11Device* device, ID3D11DeviceContext* contex
     m_textures[T_BRIGHT]         = CreateTexture(W, H, DXGI_FORMAT_R16G16B16A16_UNORM, srv_rtv);
     m_textures[T_BLOOM_VERT]     = CreateTexture(W, H, DXGI_FORMAT_R16G16B16A16_UNORM, srv_rtv);
     m_textures[T_BLOOM_HORIZ]    = CreateTexture(W, H, DXGI_FORMAT_R16G16B16A16_UNORM, srv_rtv);
-    m_textures[T_GEOMETRY]       = CreateTexture(W, H, DXGI_FORMAT_R16G16B16A16_UNORM, srv_rtv);
 
     if (!m_error.empty())
     {
@@ -331,8 +348,20 @@ bool NativeLeanCRT::Initialize(ID3D11Device* device, ID3D11DeviceContext* contex
         return false;
     }
 
+    D3D11_RASTERIZER_DESC raster_desc = {};
+    raster_desc.FillMode              = D3D11_FILL_SOLID;
+    raster_desc.CullMode              = D3D11_CULL_NONE;
+    raster_desc.DepthClipEnable       = TRUE;
+    raster_desc.ScissorEnable         = FALSE;
+    hr = m_device->CreateRasterizerState(&raster_desc, &m_rasterizer);
+    if (FAILED(hr))
+    {
+        error = L"CreateRasterizerState failed: " + HResultText(hr);
+        return false;
+    }
+
     D3D11_BUFFER_DESC cb_desc = {};
-    cb_desc.ByteWidth = 16;
+    cb_desc.ByteWidth = sizeof(FrameConstants);
     cb_desc.Usage     = D3D11_USAGE_DEFAULT;
     cb_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     hr = m_device->CreateBuffer(&cb_desc, nullptr, &m_frame_cb);
@@ -346,15 +375,28 @@ bool NativeLeanCRT::Initialize(ID3D11Device* device, ID3D11DeviceContext* contex
         "Texture2D<float4> source_texture : register(t18);\n"
         "SamplerState source_sampler : register(s0);\n"
         "float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET\n"
-        "{ return float4(source_texture.Sample(source_sampler, uv).rgb, 1.0); }\n";
+        "{\n"
+        "    float3 c = saturate(source_texture.Sample(source_sampler, uv).rgb);\n"
+        "    return float4(pow(c, float3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2)), 1.0);\n"
+        "}\n";
 
     ComPtr<ID3DBlob> blit_blob;
     ComPtr<ID3DBlob> blit_errors;
     hr = D3DCompile(blit_source, std::strlen(blit_source), "LeanCRTBlit.hlsl", nullptr, nullptr,
         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &blit_blob, &blit_errors);
-    if (FAILED(hr) || FAILED(m_device->CreatePixelShader(blit_blob->GetBufferPointer(), blit_blob->GetBufferSize(), nullptr, &m_blit_ps)))
+    if (FAILED(hr) || !blit_blob)
     {
-        error = L"Blit shader creation failed: " + HResultText(hr);
+        error = L"Blit shader compilation failed: " + HResultText(hr);
+        if (blit_errors)
+            error += L"\n" + std::wstring(static_cast<const char*>(blit_errors->GetBufferPointer()),
+                static_cast<const char*>(blit_errors->GetBufferPointer()) + blit_errors->GetBufferSize());
+        return false;
+    }
+
+    hr = m_device->CreatePixelShader(blit_blob->GetBufferPointer(), blit_blob->GetBufferSize(), nullptr, &m_blit_ps);
+    if (FAILED(hr))
+    {
+        error = L"Blit pixel shader creation failed: " + HResultText(hr);
         return false;
     }
 
@@ -362,14 +404,13 @@ bool NativeLeanCRT::Initialize(ID3D11Device* device, ID3D11DeviceContext* contex
     const char* vs_entries[] = {
         "F__calculateBeamDistsVS", "F__leanCachedBeamVS", "F__PostProcessVS", "F__blurVerticalVS",
         "F__blurHorizontalVS", "F__deinterlaceVS", "F__freezeFrameVS", "F__generatePhosphorMaskVS",
-        "F__brightpassVS", "F__leanBloomVerticalVS", "F__bloomHorizontalVS", "F__leanGeometryCacheVS",
-        "F__leanOutputVS"
+        "F__brightpassVS", "F__leanBloomVerticalVS", "F__bloomHorizontalVS",
     };
     const char* ps_entries[] = {
         "F__calculateBeamDistsPS", "F__leanCachedBeamPS", "F__leanBeamsPS", "F__leanApproxBloomPS",
         "F__blurVerticalPS", "F__blurHorizontalPS", "F__deinterlacePS", "F__freezeFramePS",
         "F__leanPhosphorPS", "F__leanMaskPS", "F__brightpassPS", "F__leanBloomVerticalPS",
-        "F__bloomHorizontalPS", "F__geometryPS", "F__leanOutputPS"
+        "F__bloomHorizontalPS",
     };
 
     for (const char* entry : vs_entries)
@@ -425,7 +466,9 @@ void NativeLeanCRT::RunMaskPrewarm()
 
     for (UINT frame = 0; frame < 64; ++frame)
     {
-        m_context->UpdateSubresource(m_frame_cb.Get(), 0, nullptr, &frame, 0, 0);
+        FrameConstants constants = {};
+        constants.frame_count = frame;
+        m_context->UpdateSubresource(m_frame_cb.Get(), 0, nullptr, &constants, 0, 0);
         m_context->Draw(4, 0);
     }
 }
@@ -437,23 +480,28 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
 
     m_textures[T_INPUT].srv = input;
     const UINT frame = m_frame++;
-    m_context->UpdateSubresource(m_frame_cb.Get(), 0, nullptr, &frame, 0, 0);
+    FrameConstants constants = {};
+    constants.frame_count = frame;
+    m_context->UpdateSubresource(m_frame_cb.Get(), 0, nullptr, &constants, 0, 0);
+
+    m_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+    m_context->OMSetDepthStencilState(nullptr, 0);
+    m_context->RSSetState(m_rasterizer.Get());
 
     static const Pass passes[] = {
-        { "BeamLookup", "F__calculateBeamDistsVS", "F__calculateBeamDistsPS", T_BEAM_DIST, false },
-        { "CachedBeams", "F__leanCachedBeamVS", "F__leanCachedBeamPS", T_ELECTRON_BEAMS, false },
-        { "BeamsConvergence", "F__PostProcessVS", "F__leanBeamsPS", T_BEAM_CONVERGENCE, true },
-        { "BloomApprox", "F__PostProcessVS", "F__leanApproxBloomPS", T_BLOOM_APPROX_H, true },
-        { "DiffusionVert", "F__blurVerticalVS", "F__blurVerticalPS", T_BLUR_VERT, true },
-        { "DiffusionHoriz", "F__blurHorizontalVS", "F__blurHorizontalPS", T_BLUR_HORIZ, true },
-        { "Deinterlace", "F__deinterlaceVS", "F__deinterlacePS", T_DEINTERLACE, true },
-        { "History", "F__freezeFrameVS", "F__freezeFramePS", T_FREEZE, false },
-        { "PhosphorLookup", "F__generatePhosphorMaskVS", "F__leanPhosphorPS", T_PHOSPHOR_MASK, false },
-        { "Mask", "F__PostProcessVS", "F__leanMaskPS", T_MASKED, true },
-        { "Bright", "F__brightpassVS", "F__brightpassPS", T_BRIGHT, true },
-        { "BloomVert", "F__leanBloomVerticalVS", "F__leanBloomVerticalPS", T_BLOOM_VERT, true },
-        { "BloomComposite", "F__bloomHorizontalVS", "F__bloomHorizontalPS", T_BLOOM_HORIZ, true },
-        { "GeometryCache", "F__leanGeometryCacheVS", "F__geometryPS", T_GEOMETRY, false },
+        { "BeamLookup", "F__calculateBeamDistsVS", "F__calculateBeamDistsPS", T_BEAM_DIST, -1, false },
+        { "CachedBeams", "F__leanCachedBeamVS", "F__leanCachedBeamPS", T_ELECTRON_BEAMS, -1, false },
+        { "BeamsConvergence", "F__PostProcessVS", "F__leanBeamsPS", T_BEAM_CONVERGENCE, -1, true },
+        { "BloomApprox", "F__PostProcessVS", "F__leanApproxBloomPS", T_BLOOM_APPROX_H, -1, true },
+        { "DiffusionVert", "F__blurVerticalVS", "F__blurVerticalPS", T_BLUR_VERT, -1, true },
+        { "DiffusionHoriz", "F__blurHorizontalVS", "F__blurHorizontalPS", T_BLUR_HORIZ, -1, true },
+        { "Deinterlace", "F__deinterlaceVS", "F__deinterlacePS", T_DEINTERLACE, -1, true },
+        { "History", "F__freezeFrameVS", "F__freezeFramePS", T_FREEZE, -1, false },
+        { "PhosphorLookup", "F__generatePhosphorMaskVS", "F__leanPhosphorPS", T_PHOSPHOR_MASK, T_PHOSPHOR_BLUE, false },
+        { "Mask", "F__PostProcessVS", "F__leanMaskPS", T_MASKED, -1, true },
+        { "Bright", "F__brightpassVS", "F__brightpassPS", T_BRIGHT, -1, true },
+        { "BloomVert", "F__leanBloomVerticalVS", "F__leanBloomVerticalPS", T_BLOOM_VERT, -1, true },
+        { "BloomComposite", "F__bloomHorizontalVS", "F__bloomHorizontalPS", T_BLOOM_HORIZ, -1, true },
     };
 
     const float black[4] = { 0, 0, 0, 1 };
@@ -465,10 +513,17 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
         if (!vs || !ps)
             return;
 
-        ID3D11RenderTargetView* rtv = m_textures[pass.rt].rtv.Get();
-        m_context->OMSetRenderTargets(1, &rtv, nullptr);
+        ID3D11RenderTargetView* rtvs[2] = { m_textures[pass.rt].rtv.Get(), nullptr };
+        UINT rtv_count = 1;
+        if (pass.rt1 >= 0)
+        {
+            rtvs[1] = m_textures[pass.rt1].rtv.Get();
+            rtv_count = 2;
+        }
+        m_context->OMSetRenderTargets(rtv_count, rtvs, nullptr);
         if (pass.clear)
-            m_context->ClearRenderTargetView(rtv, black);
+            for (UINT i = 0; i < rtv_count; ++i)
+                m_context->ClearRenderTargetView(rtvs[i], black);
 
         D3D11_VIEWPORT viewport = {};
         viewport.Width    = static_cast<float>(m_textures[pass.rt].w);
@@ -510,6 +565,17 @@ void NativeLeanCRT::Render(ID3D11ShaderResourceView* input, ID3D11RenderTargetVi
     m_context->PSSetShaderResources(0, T_COUNT, srvs);
     m_context->PSSetSamplers(0, 1, &sampler);
     m_context->Draw(4, 0);
+
+    // Leave no RTV/SRV references on the context. ResizeBuffers fails while the
+    // back buffer or intermediate views are still bound.
+    ID3D11RenderTargetView* null_rtv = nullptr;
+    m_context->OMSetRenderTargets(1, &null_rtv, nullptr);
+    ID3D11ShaderResourceView* null_srvs[T_COUNT] = {};
+    m_context->PSSetShaderResources(0, T_COUNT, null_srvs);
+    m_context->VSSetShaderResources(0, T_COUNT, null_srvs);
+    ID3D11SamplerState* null_samplers[3] = {};
+    m_context->PSSetSamplers(0, 3, null_samplers);
+    m_context->VSSetSamplers(0, 3, null_samplers);
 
     // Do not keep the capture texture alive between frames.
     m_textures[T_INPUT].srv = nullptr;

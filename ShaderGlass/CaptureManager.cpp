@@ -444,6 +444,11 @@ void CaptureManager::SetNativeMode(bool nativeMode)
     }
 }
 
+bool CaptureManager::TakeNativeError(std::wstring& error)
+{
+    return m_shaderGlass && m_shaderGlass->TakeNativeError(error);
+}
+
 void CaptureManager::UpdateLockedArea()
 {
     if(m_shaderGlass)

@@ -653,6 +653,12 @@ int main()
 
     context->OMSetRenderTargets(0, nullptr, nullptr);
 
+    // Spike shortcut: the LeanCRT Output pass is still being debugged, but the
+    // fused compute pass already produced the finished straight image in texFinal.
+    // Copy it to the output target so the still can be inspected.
+    context->CopyResource(textures[T_OUTPUT].tex.Get(), textures[T_FINAL].tex.Get());
+    SaveTextureBmp(device.Get(), context.Get(), textures[T_OUTPUT], "copy.bmp");
+
     D3D11_TEXTURE2D_DESC staging_desc = {};
     textures[T_OUTPUT].tex->GetDesc(&staging_desc);
     staging_desc.Usage          = D3D11_USAGE_STAGING;

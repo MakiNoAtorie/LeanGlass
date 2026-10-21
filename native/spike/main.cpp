@@ -3,6 +3,7 @@
 // No ReShade runtime. The HLSL is generated from the unmodified LeanCRT source
 // with ReShade's fxc in performance/spec-constant mode (see README.md).
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
